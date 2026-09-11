@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      3.0.0
+// @version      3.1.0
 // @description  Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie - port sprawdzonego, działającego skryptu użytkownika pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -28,7 +28,7 @@
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
   description: 'Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie.',
-  version: '3.0.0',
+  version: '3.1.0',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
@@ -107,7 +107,7 @@
       .leg-neon-loot, .leg-neon-map {
         position: fixed !important; pointer-events: none !important; box-sizing: border-box !important;
         background: transparent !important; --leg-glow: 1; --leg-color-1: #ff36d1; --leg-color-2: #ff007a;
-        --leg-speed: 1; --leg-chase-angle: 0deg; z-index: 999996 !important; overflow: visible !important;
+        --leg-speed: 1; --leg-chase-angle: 0deg; overflow: visible !important;
       }
 
       .leg-mode-classic {
@@ -196,7 +196,7 @@
 
       .leg-neon-text {
         position: fixed !important; left: 50% !important; top: 8% !important; transform: translateX(-50%) !important;
-        z-index: 999999 !important; pointer-events: none !important; color: #fff !important;
+        pointer-events: none !important; color: #fff !important;
         font-family: Arial, sans-serif !important; font-size: 32px !important; font-weight: 900 !important;
         letter-spacing: 5px !important; white-space: nowrap !important;
         --leg-color-1: #ff36d1; --leg-color-2: #ff007a; --leg-speed: 1;
@@ -257,6 +257,9 @@
     this.mapOverlay.style.top = rect.top - 4 + 'px';
     this.mapOverlay.style.width = rect.width + 8 + 'px';
     this.mapOverlay.style.height = rect.height + 8 + 'px';
+    // Tuż nad samą mapą, nie nad całą grą - żeby dymki nadal pokazywały się nad ramką.
+    const canvasZ = parseInt(getComputedStyle(canvas).zIndex, 10);
+    this.mapOverlay.style.zIndex = String((Number.isFinite(canvasZ) ? canvasZ : 1) + 1);
   },
 
   positionLootOverlay() {
@@ -266,6 +269,10 @@
     this.lootOverlay.style.top = rect.top - 5 + 'px';
     this.lootOverlay.style.width = rect.width + 10 + 'px';
     this.lootOverlay.style.height = rect.height + 10 + 'px';
+    // Tuż nad samym oknem łupu, nie nad całą grą - żeby dymki (tooltipy przedmiotów,
+    // które mają wyższy z-index niż zwykłe okna) dalej pokazywały się NAD naszą ramką.
+    const windowZ = parseInt(getComputedStyle(this.activeLootWindow).zIndex, 10);
+    this.lootOverlay.style.zIndex = String((Number.isFinite(windowZ) ? windowZ : 1) + 1);
   },
 
   applyNeonMode(settings) {
@@ -335,6 +342,9 @@
       this.textOverlay = document.createElement('div');
       this.textOverlay.className = 'leg-neon-text';
       this.textOverlay.textContent = settings.legendaryTextValue || '✦ LEGENDARY DROP ✦';
+      // Skromny, stały z-index - napis ma się wyróżniać na tle gry, ale dymki
+      // (tooltipy przedmiotów) mają nadal pokazywać się nad nim, nie pod nim.
+      this.textOverlay.style.zIndex = '50';
       document.body.appendChild(this.textOverlay);
     }
     if (settings.itemGlow) {
