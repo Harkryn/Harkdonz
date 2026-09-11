@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      2.0.1
+// @version      2.1.0
 // @description  Dźwięk, toast i wielowarstwowe, konfigurowalne neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie - przepisane z zestawu Shacal Customizer pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -26,7 +26,7 @@
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
   description: 'Dźwięk, toast i wielowarstwowe neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie.',
-  version: '2.0.1',
+  version: '2.1.0',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
@@ -169,8 +169,9 @@
   LOOT_WINDOW_SELECTOR: '.loot-wnd, .loot-window, [class*="loot-wnd"], [class*="loot-window"]',
   MAP_SELECTORS: ['.map-wrapper', '.map-layer', '.game-window', '[class*="map-wrapper"]', '[class*="map-layer"]'],
 
-  seen: null,
+  elementSignatures: null,
   observer: null,
+  pollTimer: null,
   audioCtx: null,
   lastNotifyTime: 0,
   currentSettings: null,
@@ -260,6 +261,9 @@
     try {
       if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const ctx = this.audioCtx;
+      // Przeglądarki wstrzymują AudioContext dopóki strona nie miała żadnej interakcji
+      // użytkownika - bez tego dźwięk potrafi być cicho bez żadnego błędu w konsoli.
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
       const now = ctx.currentTime;
       const masterGain = ctx.createGain();
       masterGain.gain.value = Math.max(0, Math.min(1, (Number(volumePercent) || 0) / 100)) * 0.4;
@@ -433,9 +437,25 @@
     return cleaned || 'Nieznany przedmiot';
   },
 
+  // Sygnatura treści (nie referencja do elementu!) - Margonem może recyklingować sloty
+  // w oknie łupu, czyli podmieniać atrybuty na JUŻ ISTNIEJĄCYM elemencie zamiast tworzyć
+  // nowy. WeakSet po samym elemencie zablokowałby wtedy powiadomienia na zawsze po
+  // pierwszym trafieniu w dany slot. Tu porównujemy zawartość, więc zmiana przedmiotu
+  // w tym samym slocie też wywoła nowe powiadomienie.
+  getSignature(el) {
+    return (
+      (el.getAttribute('data-item-type') || '') +
+      '|' +
+      (el.getAttribute('data-frame-mania-rarity') || '') +
+      '|' +
+      this.extractItemName(el)
+    );
+  },
+
   handleLegendaryElement(el, settings) {
-    if (this.seen.has(el)) return;
-    this.seen.add(el);
+    const signature = this.getSignature(el);
+    if (this.elementSignatures.get(el) === signature) return;
+    this.elementSignatures.set(el, signature);
 
     const now = Date.now();
     const cooldownMs = Math.max(0, Number(settings.limitOdstepuSekundy) || 0) * 1000;
@@ -458,6 +478,10 @@
     }
   },
 
+  scanAll(settings) {
+    document.querySelectorAll(this.activeSelector(settings)).forEach((el) => this.handleLegendaryElement(el, settings));
+  },
+
   scanNode(node, settings) {
     if (!(node instanceof Element)) return;
     const selector = this.activeSelector(settings);
@@ -465,22 +489,52 @@
     node.querySelectorAll && node.querySelectorAll(selector).forEach((el) => this.handleLegendaryElement(el, settings));
   },
 
+  scanAttributeTarget(target, settings) {
+    if (!(target instanceof Element)) return;
+    if (target.matches && target.matches(this.activeSelector(settings))) this.handleLegendaryElement(target, settings);
+  },
+
   onEnable(settings) {
-    this.seen = new WeakSet();
+    this.elementSignatures = new WeakMap();
     this.currentSettings = settings;
+    this.lastNotifyTime = 0;
+
+    // Stan początkowy zapisujemy po cichu (bez powiadomienia) - interesują nas tylko
+    // zmiany od teraz, nie to co już jest w oknie łupu w chwili włączenia dodatku.
+    document.querySelectorAll(this.activeSelector(settings)).forEach((el) => {
+      this.elementSignatures.set(el, this.getSignature(el));
+    });
+
     this.observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => this.scanNode(node, this.currentSettings));
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => this.scanNode(node, this.currentSettings));
+        } else if (mutation.type === 'attributes') {
+          this.scanAttributeTarget(mutation.target, this.currentSettings);
+        }
       }
     });
-    this.observer.observe(document.body, { childList: true, subtree: true });
-    document.querySelectorAll(this.activeSelector(settings)).forEach((el) => this.seen.add(el));
+    this.observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-item-type', 'data-frame-mania-rarity'],
+    });
+
+    // Zapasowe okresowe skanowanie na wypadek, gdyby gra aktualizowała DOM w sposób,
+    // którego MutationObserver z jakiegoś powodu nie złapie - lepiej sprawdzać co 1.5s
+    // niż całkowicie przegapić drop.
+    this.pollTimer = setInterval(() => this.scanAll(this.currentSettings), 1500);
   },
 
   onDisable() {
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
+    }
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
   },
 
