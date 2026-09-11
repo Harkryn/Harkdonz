@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      3.1.0
+// @version      3.1.1
 // @description  Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie - port sprawdzonego, działającego skryptu użytkownika pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -28,7 +28,7 @@
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
   description: 'Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie.',
-  version: '3.1.0',
+  version: '3.1.1',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
@@ -257,9 +257,10 @@
     this.mapOverlay.style.top = rect.top - 4 + 'px';
     this.mapOverlay.style.width = rect.width + 8 + 'px';
     this.mapOverlay.style.height = rect.height + 8 + 'px';
-    // Tuż nad samą mapą, nie nad całą grą - żeby dymki nadal pokazywały się nad ramką.
+    // Tuż POD mapą (nie nad nią) - brzegi ramki i tak wystają poza canvas, więc są
+    // widoczne, a dymki (wyżej w warstwach niż zwykłe elementy gry) zostają na wierzchu.
     const canvasZ = parseInt(getComputedStyle(canvas).zIndex, 10);
-    this.mapOverlay.style.zIndex = String((Number.isFinite(canvasZ) ? canvasZ : 1) + 1);
+    this.mapOverlay.style.zIndex = String(Math.max(0, (Number.isFinite(canvasZ) ? canvasZ : 1) - 1));
   },
 
   positionLootOverlay() {
@@ -269,10 +270,10 @@
     this.lootOverlay.style.top = rect.top - 5 + 'px';
     this.lootOverlay.style.width = rect.width + 10 + 'px';
     this.lootOverlay.style.height = rect.height + 10 + 'px';
-    // Tuż nad samym oknem łupu, nie nad całą grą - żeby dymki (tooltipy przedmiotów,
-    // które mają wyższy z-index niż zwykłe okna) dalej pokazywały się NAD naszą ramką.
+    // Tuż POD oknem łupu (nie nad nim) - brzegi ramki i tak wystają poza okno, więc są
+    // widoczne, a dymki (wyżej w warstwach niż zwykłe okna) zostają na wierzchu.
     const windowZ = parseInt(getComputedStyle(this.activeLootWindow).zIndex, 10);
-    this.lootOverlay.style.zIndex = String((Number.isFinite(windowZ) ? windowZ : 1) + 1);
+    this.lootOverlay.style.zIndex = String(Math.max(0, (Number.isFinite(windowZ) ? windowZ : 1) - 1));
   },
 
   applyNeonMode(settings) {
@@ -342,9 +343,9 @@
       this.textOverlay = document.createElement('div');
       this.textOverlay.className = 'leg-neon-text';
       this.textOverlay.textContent = settings.legendaryTextValue || '✦ LEGENDARY DROP ✦';
-      // Skromny, stały z-index - napis ma się wyróżniać na tle gry, ale dymki
-      // (tooltipy przedmiotów) mają nadal pokazywać się nad nim, nie pod nim.
-      this.textOverlay.style.zIndex = '50';
+      // Bardzo skromny, stały z-index - napis ma być widoczny na tle mapy, ale dymki
+      // (tooltipy przedmiotów) mają zawsze pokazywać się nad nim, nie pod nim.
+      this.textOverlay.style.zIndex = '3';
       document.body.appendChild(this.textOverlay);
     }
     if (settings.itemGlow) {
