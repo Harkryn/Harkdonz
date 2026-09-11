@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Margonem Addon Loader
 // @namespace    margonem-addon-loader
-// @version      1.1.0
+// @version      1.3.0
 // @description  Minimalistyczny, ciemny panel do zarządzania dodatkami Margonem. Sam w sobie nic nie robi - jest bazą, do której podpinają się przyszłe dodatki.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -27,6 +27,7 @@
  *       { key: 'tekst',    type: 'text',    label: 'Jakiś tekst', placeholder: '...' },
  *       { key: 'liczba',   type: 'number',  label: 'Jakaś liczba', min: 0, max: 100 },
  *       { key: 'wybor',    type: 'select',  label: 'Wybór', options: [{ value: 'a', label: 'A' }] },
+ *       { key: 'kolor',    type: 'color',   label: 'Kolor', default: '#7c5cff' }, // natywny picker koloru (paleta)
  *       { key: 'akcja',    type: 'button',  label: 'Testuj', onClick(settings) { ... } }, // "this" wewnątrz onClick to config dodatku
  *     ],
  *     onEnable(settings) {},              // wywoływane po włączeniu dodatku
@@ -156,6 +157,7 @@
     .mal-modal-header {
       display: flex; align-items: center; gap: 10px; padding: 14px 18px;
       border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+      cursor: move; user-select: none; -webkit-user-select: none;
     }
     .mal-modal-title { font-size: 14px; font-weight: 600; letter-spacing: .2px; }
     .mal-modal-count { font-size: 11px; color: #8b8d98; background: #1f2025; border-radius: 999px; padding: 3px 9px; }
@@ -202,6 +204,12 @@
       padding: 7px 14px; border-radius: 7px; font-size: 12px; cursor: pointer; transition: background .15s ease;
     }
     .mal-btn:hover { background: #312c40; }
+    .mal-color {
+      width: 40px; height: 26px; padding: 2px; border-radius: 7px; flex-shrink: 0;
+      background: #101114; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+    }
+    .mal-color::-webkit-color-swatch-wrapper { padding: 0; }
+    .mal-color::-webkit-color-swatch { border: none; border-radius: 4px; }
     .mal-empty { padding: 40px 20px; text-align: center; color: #6b6d76; font-size: 12.5px; line-height: 1.6; }
     .mal-modal-footer {
       padding: 8px 18px; font-size: 10px; color: #5c5e66; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
@@ -241,7 +249,8 @@
     }
 
     const value = record.settings[field.key];
-    const wrap = el('label', { class: 'mal-field' + (field.type === 'boolean' ? ' mal-field-boolean' : '') });
+    const isRowLayout = field.type === 'boolean' || field.type === 'color';
+    const wrap = el('label', { class: 'mal-field' + (isRowLayout ? ' mal-field-boolean' : '') });
     wrap.appendChild(el('span', { class: 'mal-field-label' }, [field.label || field.key]));
 
     let input;
@@ -260,6 +269,11 @@
         input.appendChild(o);
       });
       input.addEventListener('change', () => handleFieldChange(record, field.key, input.value));
+      wrap.appendChild(input);
+    } else if (field.type === 'color') {
+      input = el('input', { type: 'color', class: 'mal-color' });
+      input.value = /^#[0-9a-f]{6}$/i.test(value || '') ? value : field.default || '#7c5cff';
+      input.addEventListener('input', () => handleFieldChange(record, field.key, input.value));
       wrap.appendChild(input);
     } else {
       const type = field.type === 'number' ? 'number' : 'text';
@@ -370,6 +384,85 @@
     updateCount();
   }
 
+  // Pozwala przeciągać `moveEl` łapiąc za `handleEl`. Pozycja jest zapamiętywana w
+  // localStorage pod `storageKey` i odtwarzana przy kolejnym starcie. Zwraca obiekt
+  // z `wasDragged()`, żeby odróżnić kliknięcie (otwórz) od przeciągnięcia (nie otwieraj).
+  function makeDraggable(handleEl, moveEl, storageKey, opts) {
+    opts = opts || {};
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function clampToViewport(left, top) {
+      const rect = moveEl.getBoundingClientRect();
+      const maxLeft = Math.max(4, window.innerWidth - rect.width - 4);
+      const maxTop = Math.max(4, window.innerHeight - rect.height - 4);
+      return { left: Math.min(Math.max(4, left), maxLeft), top: Math.min(Math.max(4, top), maxTop) };
+    }
+
+    function pinToFixed(left, top) {
+      moveEl.style.position = 'fixed';
+      moveEl.style.margin = '0';
+      if (opts.clearBottomRight) {
+        moveEl.style.right = 'auto';
+        moveEl.style.bottom = 'auto';
+      }
+      moveEl.style.left = left + 'px';
+      moveEl.style.top = top + 'px';
+    }
+
+    const saved = readJSON(storageKey, null);
+    if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+      // getBoundingClientRect() wymusza natychmiastowy layout, więc nie trzeba czekać
+      // na requestAnimationFrame - odczyt jest wiarygodny od razu.
+      const clamped = clampToViewport(saved.left, saved.top);
+      pinToFixed(clamped.left, clamped.top);
+    }
+
+    handleEl.style.touchAction = 'none';
+    handleEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (opts.ignoreSelector && e.target.closest(opts.ignoreSelector)) return;
+      dragging = true;
+      moved = false;
+      const rect = moveEl.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+      startX = e.clientX;
+      startY = e.clientY;
+      handleEl.setPointerCapture(e.pointerId);
+    });
+    handleEl.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) > 4) moved = true;
+      if (!moved) return;
+      const clamped = clampToViewport(startLeft + dx, startTop + dy);
+      pinToFixed(clamped.left, clamped.top);
+    });
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        handleEl.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        /* pointer capture already released */
+      }
+      if (moved) {
+        const rect = moveEl.getBoundingClientRect();
+        writeJSON(storageKey, { left: rect.left, top: rect.top });
+      }
+    };
+    handleEl.addEventListener('pointerup', endDrag);
+    handleEl.addEventListener('pointercancel', endDrag);
+
+    return { wasDragged: () => moved };
+  }
+
   function ensureUI() {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -391,7 +484,7 @@
     const tabsEl = el('div', { class: 'mal-tabs' });
     const contentEl = el('div', { class: 'mal-content' });
     const body = el('div', { class: 'mal-modal-body' }, [tabsEl, contentEl]);
-    const footer = el('div', { class: 'mal-modal-footer' }, ['Margonem Addon Loader v1.1.0']);
+    const footer = el('div', { class: 'mal-modal-footer' }, ['Margonem Addon Loader v1.3.0']);
     const modal = el('div', { id: 'mal-modal' }, [header, body, footer]);
 
     backdrop.appendChild(modal);
@@ -402,11 +495,20 @@
       if (e.key === 'Escape') closeModal();
     });
 
-    toggleBtn.addEventListener('click', () => backdrop.classList.toggle('mal-open'));
-
     const root = el('div', { id: 'mal-root' }, [toggleBtn]);
     document.body.appendChild(root);
     document.body.appendChild(backdrop);
+
+    const buttonDrag = makeDraggable(toggleBtn, root, STORAGE_PREFIX + 'ui:button-pos', { clearBottomRight: true });
+    toggleBtn.addEventListener('click', (e) => {
+      if (buttonDrag.wasDragged()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      backdrop.classList.toggle('mal-open');
+    });
+    makeDraggable(header, modal, STORAGE_PREFIX + 'ui:modal-pos', { ignoreSelector: '.mal-close-btn' });
 
     state.tabsEl = tabsEl;
     state.contentEl = contentEl;
