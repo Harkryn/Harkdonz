@@ -8,8 +8,8 @@
 // @match        *://*.margonem.com/*
 // @run-at       document-idle
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/TWOJ-LOGIN/TWOJE-REPO/main/margonem-addon-loader.user.js
-// @downloadURL  https://raw.githubusercontent.com/TWOJ-LOGIN/TWOJE-REPO/main/margonem-addon-loader.user.js
+// @updateURL    https://raw.githubusercontent.com/Harkryn/Harkdonz/main/margonem-addon-loader.user.js
+// @downloadURL  https://raw.githubusercontent.com/Harkryn/Harkdonz/main/margonem-addon-loader.user.js
 // ==/UserScript==
 
 /**

@@ -8,8 +8,8 @@
 // @match        *://*.margonem.com/*
 // @run-at       document-idle
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/TWOJ-LOGIN/TWOJE-REPO/main/example-addon.user.js
-// @downloadURL  https://raw.githubusercontent.com/TWOJ-LOGIN/TWOJE-REPO/main/example-addon.user.js
+// @updateURL    https://raw.githubusercontent.com/Harkryn/Harkdonz/main/example-addon.user.js
+// @downloadURL  https://raw.githubusercontent.com/Harkryn/Harkdonz/main/example-addon.user.js
 // ==/UserScript==
 
 (function register(config) {
