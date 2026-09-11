@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Wołacz bossów
 // @namespace    margonem-addon-loader
-// @version      1.0.1
+// @version      1.1.0
 // @description  Wykrywa Herosów, Kolosów i Tytanów na mapie i powiadamia (toast/dźwięk/kopiowanie do schowka).
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -19,7 +19,7 @@
   id: 'wolacz-bossow',
   name: 'Wołacz bossów',
   description: 'Powiadamia o Herosach, Kolosach i Tytanach widocznych na mapie.',
-  version: '1.0.1',
+  version: '1.1.0',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/wolacz-bossow.user.js',
   defaultEnabled: false,
   defaultSettings: {
@@ -29,7 +29,8 @@
     dzwiek: true,
     toast: true,
     kopiujDoSchowka: false,
-    szablon: 'Uwaga! {TYP} {NAZWA} na mapie {MAPA} ({KOORDY})',
+    kanal: '/k',
+    szablon: '{KANAL} Uwaga! {TYP} {NAZWA} na mapie {MAPA} ({KOORDY})',
   },
   settingsSchema: [
     { key: 'heros', type: 'boolean', label: 'Powiadamiaj o Herosach' },
@@ -37,8 +38,17 @@
     { key: 'tytan', type: 'boolean', label: 'Powiadamiaj o Tytanach' },
     { key: 'dzwiek', type: 'boolean', label: 'Dźwięk przy wykryciu' },
     { key: 'toast', type: 'boolean', label: 'Powiadomienie w grze (toast)' },
+    {
+      key: 'kanal',
+      type: 'select',
+      label: 'Kanał ogłoszenia (do szablonu)',
+      options: [
+        { value: '/k', label: 'Klanowy (/k)' },
+        { value: '/o', label: 'Globalny (/o)' },
+      ],
+    },
     { key: 'kopiujDoSchowka', type: 'boolean', label: 'Kopiuj wiadomość do schowka' },
-    { key: 'szablon', type: 'text', label: 'Szablon wiadomości', placeholder: '{TYP} {NAZWA} {MAPA} {KOORDY}' },
+    { key: 'szablon', type: 'text', label: 'Szablon wiadomości', placeholder: '{KANAL} {TYP} {NAZWA} {MAPA} {KOORDY}' },
   ],
 
   seenKeys: null,
@@ -147,6 +157,7 @@
     setTimeout(() => this.seenKeys.delete(notice.key), 5 * 60 * 1000);
 
     const message = String(settings.szablon || '')
+      .replace(/\{KANAL\}/g, settings.kanal || '')
       .replace(/\{TYP\}/g, notice.type)
       .replace(/\{NAZWA\}/g, notice.name)
       .replace(/\{MAPA\}/g, notice.map)
