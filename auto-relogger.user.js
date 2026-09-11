@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Auto-relogger
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Automatycznie klika przycisk wznowienia sesji po rozłączeniu. Nie przechowuje ani nie wpisuje hasła.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -25,7 +25,8 @@
   id: 'auto-relogger',
   name: 'Auto-relogger',
   description: 'Klika przycisk wznowienia sesji po rozłączeniu. Nie obsługuje haseł.',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/auto-relogger.user.js',
   defaultEnabled: false,
   defaultSettings: {
     opoznienieSekundy: 3,

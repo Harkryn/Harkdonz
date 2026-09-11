@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      2.0.0
+// @version      2.0.1
 // @description  Dźwięk, toast i wielowarstwowe, konfigurowalne neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie - przepisane z zestawu Shacal Customizer pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -26,7 +26,8 @@
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
   description: 'Dźwięk, toast i wielowarstwowe neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie.',
-  version: '2.0.0',
+  version: '2.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
     dzwiek: true,

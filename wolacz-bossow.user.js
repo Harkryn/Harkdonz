@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Wołacz bossów
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Wykrywa Herosów, Kolosów i Tytanów na mapie i powiadamia (toast/dźwięk/kopiowanie do schowka).
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -19,7 +19,8 @@
   id: 'wolacz-bossow',
   name: 'Wołacz bossów',
   description: 'Powiadamia o Herosach, Kolosach i Tytanach widocznych na mapie.',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/wolacz-bossow.user.js',
   defaultEnabled: false,
   defaultSettings: {
     heros: true,

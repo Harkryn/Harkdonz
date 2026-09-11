@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Ramki i dymki
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Kosmetyczne przestylowanie dymków czatu oraz ramek awatarów/portretów.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -24,7 +24,8 @@
   id: 'ramki-dymki',
   name: 'Ramki i dymki',
   description: 'Przestylowuje dymki czatu i ramki awatarów w spójnym, ciemnym stylu.',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/ramki-dymki.user.js',
   defaultEnabled: false,
   defaultSettings: {
     kolorAkcentu: '#7c5cff',

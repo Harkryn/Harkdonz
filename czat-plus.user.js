@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Czat plus
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Znaczniki czasu, klikalne linki i podświetlanie wzmianek na czacie.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -19,7 +19,8 @@
   id: 'czat-plus',
   name: 'Czat plus',
   description: 'Znaczniki czasu, klikalne odnośniki i podświetlanie wzmianek Twojego nicku.',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/czat-plus.user.js',
   defaultEnabled: false,
   defaultSettings: {
     znacznikCzasu: true,

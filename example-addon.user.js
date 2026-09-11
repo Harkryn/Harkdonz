@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Margonem Addon Loader - Przykładowy dodatek
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Szablon pokazujący jak podpiąć nowy dodatek pod Margonem Addon Loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -23,7 +23,8 @@
   id: 'przyklad',
   name: 'Przykładowy dodatek',
   description: 'Pokazuje jak korzystać z ustawień i cyklu życia dodatku.',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/example-addon.user.js',
   defaultEnabled: false,
   defaultSettings: {
     powitanie: true,

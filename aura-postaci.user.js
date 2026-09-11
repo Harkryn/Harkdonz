@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Aura postaci
 // @namespace    margonem-addon-loader
-// @version      1.0.0
+// @version      1.0.1
 // @description  Kosmetyczna, pulsująca aura wokół wskazanego elementu (np. nicku postaci).
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -27,7 +27,8 @@
   id: 'aura-postaci',
   name: 'Aura postaci',
   description: 'Pulsująca, kolorowa poświata wokół wybranego elementu (np. nicku postaci).',
-  version: '1.0.0',
+  version: '1.0.1',
+  updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/aura-postaci.user.js',
   defaultEnabled: false,
   defaultSettings: {
     selektor: '.hero .name-label, .hero-nick, [class*="hero"] [class*="name"]',
