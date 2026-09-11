@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      2.1.0
+// @version      2.1.1
 // @description  Dźwięk, toast i wielowarstwowe, konfigurowalne neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie - przepisane z zestawu Shacal Customizer pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -26,7 +26,7 @@
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
   description: 'Dźwięk, toast i wielowarstwowe neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie.',
-  version: '2.1.0',
+  version: '2.1.1',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
@@ -172,6 +172,7 @@
   elementSignatures: null,
   observer: null,
   pollTimer: null,
+  scanScheduled: false,
   audioCtx: null,
   lastNotifyTime: 0,
   currentSettings: null,
@@ -482,22 +483,25 @@
     document.querySelectorAll(this.activeSelector(settings)).forEach((el) => this.handleLegendaryElement(el, settings));
   },
 
-  scanNode(node, settings) {
-    if (!(node instanceof Element)) return;
-    const selector = this.activeSelector(settings);
-    if (node.matches && node.matches(selector)) this.handleLegendaryElement(node, settings);
-    node.querySelectorAll && node.querySelectorAll(selector).forEach((el) => this.handleLegendaryElement(el, settings));
-  },
-
-  scanAttributeTarget(target, settings) {
-    if (!(target instanceof Element)) return;
-    if (target.matches && target.matches(this.activeSelector(settings))) this.handleLegendaryElement(target, settings);
+  // Dokładnie ich technika z panel.js (core/events-and-panel.js): jeden szeroki
+  // MutationObserver na całym body, a przy KAŻDEJ mutacji (dodanie węzła LUB zmiana
+  // atrybutu rzadkości/typu przedmiotu) planujemy pełne przeskanowanie w najbliższej
+  // klatce przez requestAnimationFrame - debounce, żeby seria mutacji w jednej klatce
+  // dała jedno skanowanie, nie dziesiątki. To realny mechanizm z ich kodu, nie zgadywany.
+  scheduleScan() {
+    if (this.scanScheduled) return;
+    this.scanScheduled = true;
+    requestAnimationFrame(() => {
+      this.scanScheduled = false;
+      this.scanAll(this.currentSettings);
+    });
   },
 
   onEnable(settings) {
     this.elementSignatures = new WeakMap();
     this.currentSettings = settings;
     this.lastNotifyTime = 0;
+    this.scanScheduled = false;
 
     // Stan początkowy zapisujemy po cichu (bez powiadomienia) - interesują nas tylko
     // zmiany od teraz, nie to co już jest w oknie łupu w chwili włączenia dodatku.
@@ -505,15 +509,7 @@
       this.elementSignatures.set(el, this.getSignature(el));
     });
 
-    this.observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          mutation.addedNodes.forEach((node) => this.scanNode(node, this.currentSettings));
-        } else if (mutation.type === 'attributes') {
-          this.scanAttributeTarget(mutation.target, this.currentSettings);
-        }
-      }
-    });
+    this.observer = new MutationObserver(() => this.scheduleScan());
     this.observer.observe(document.body, {
       childList: true,
       subtree: true,
@@ -522,8 +518,7 @@
     });
 
     // Zapasowe okresowe skanowanie na wypadek, gdyby gra aktualizowała DOM w sposób,
-    // którego MutationObserver z jakiegoś powodu nie złapie - lepiej sprawdzać co 1.5s
-    // niż całkowicie przegapić drop.
+    // którego nawet ten obserwator z jakiegoś powodu nie złapie.
     this.pollTimer = setInterval(() => this.scanAll(this.currentSettings), 1500);
   },
 
