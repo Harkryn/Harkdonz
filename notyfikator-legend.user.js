@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         MAL - Notyfikator legend
 // @namespace    margonem-addon-loader
-// @version      2.1.1
-// @description  Dźwięk, toast i wielowarstwowe, konfigurowalne neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie - przepisane z zestawu Shacal Customizer pod nasz loader.
+// @version      3.0.0
+// @description  Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie - port sprawdzonego, działającego skryptu użytkownika pod nasz loader.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
 // @match        *://*.margonem.com/*
@@ -13,11 +13,13 @@
 // ==/UserScript==
 
 /**
- * Ustawienia "obramowania" (kolorX/jasnoscX/przezroczystoscX/szerokoscX, stylObramowania,
- * efektObramowania, intensywnoscObramowania) to przeniesienie realnego zestawu opcji
- * z dodatku "glow" w Shacal Customizer (color1-3/glow1-3/opacity1-3/width1-3/glowStyle/
- * effect/pulse) - ten sam zakres kontroli, własna (prostsza, bez canvasu) implementacja
- * wizualna oparta o CSS box-shadow + Web Animations API zamiast ich silnika canvas.
+ * Ten dodatek to bezpośredni port działającego, samodzielnego userscriptu
+ * "Margonem - Legendary Notyfikator v3.4" pod nasz loader - ta sama logika wykrywania
+ * (MutationObserver + requestAnimationFrame, selektory .loot-wnd / data-item-type="t-leg"
+ * / #GAME_CANVAS) i te same efekty wizualne (3 tryby neonu, shader mapy, pulsujący zoom,
+ * podświetlenie itemu, napis). Zmieniło się tylko to, JAK włącza się/wyłącza (przez nasz
+ * loader zamiast działać zawsze) i GDZIE są ustawienia (nasz panel zamiast własnego
+ * okienka z przyciskiem-zębatką).
  */
 (function register(config) {
   if (window.MAL) window.MAL.registerAddon(config);
@@ -25,515 +27,449 @@
 })({
   id: 'notyfikator-legend',
   name: 'Notyfikator legend',
-  description: 'Dźwięk, toast i wielowarstwowe neonowe obramowanie okna łupu/mapy przy legendarnym przedmiocie.',
-  version: '2.1.1',
+  description: 'Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie.',
+  version: '3.0.0',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/notyfikator-legend.user.js',
   defaultEnabled: false,
   defaultSettings: {
-    dzwiek: true,
-    wariantDzwieku: 'dzwoneczek',
-    glosnosc: 70,
-    trybWykrywania: 'tylko-legendarne',
-    limitOdstepuSekundy: 2,
-    toast: true,
-    kolorToastu: '#d4af37',
-    czasWyswietlaniaToastSekundy: 5,
-    powiadomienieSystemowe: false,
-
-    obramowanieOknaLupu: true,
-    obramowanieMapy: false,
-    stylObramowania: 'klasyczny',
-    efektObramowania: 'puls',
-    intensywnoscObramowania: 3,
-    czasObramowaniaSekundy: 4,
-
-    kolor1: '#d4af37',
-    jasnosc1: 3,
-    przezroczystosc1: 4,
-    szerokosc1: 1,
-
-    kolor2: '#ffd700',
-    jasnosc2: 2,
-    przezroczystosc2: 3,
-    szerokosc2: 2,
-
-    kolor3: '#ff8c00',
-    jasnosc3: 1,
-    przezroczystosc3: 2,
-    szerokosc3: 3,
+    lootGlow: true,
+    mapGlow: true,
+    itemGlow: true,
+    legendaryText: true,
+    animationSpeed: 100,
+    neonMode: 'classic',
+    mapShader: 'none',
+    mapZoom: true,
+    intensity: 100,
+    neonColor1: '#ff36d1',
+    neonColor2: '#ff007a',
+    legendaryTextValue: '✦ LEGENDARY DROP ✦',
   },
   settingsSchema: [
-    { key: 'dzwiek', type: 'boolean', label: 'Dźwięk przy powiadomieniu' },
+    { key: 'lootGlow', type: 'boolean', label: 'Ramka okna łupu' },
+    { key: 'mapGlow', type: 'boolean', label: 'Ramka mapy' },
+    { key: 'itemGlow', type: 'boolean', label: 'Podświetlenie itemu' },
+    { key: 'legendaryText', type: 'boolean', label: 'Napis na środku ekranu' },
+    { key: 'legendaryTextValue', type: 'text', label: 'Treść napisu', placeholder: '✦ LEGENDARY DROP ✦' },
     {
-      key: 'wariantDzwieku',
+      key: 'neonMode',
       type: 'select',
-      label: 'Wariant dźwięku',
+      label: 'Tryb neonu',
       options: [
-        { value: 'dzwoneczek', label: 'Dzwoneczek' },
-        { value: 'fanfary', label: 'Fanfary' },
-        { value: 'gong', label: 'Gong' },
-        { value: 'arpeggio', label: 'Arpeggio' },
-        { value: 'puls', label: 'Puls' },
+        { value: 'classic', label: 'Statyczny kolor' },
+        { value: 'rainbow', label: 'Tęcza-neon' },
+        { value: 'chase', label: 'Goniące się kolory' },
       ],
     },
-    { key: 'glosnosc', type: 'number', label: 'Głośność (0-100)', min: 0, max: 100 },
+    { key: 'neonColor1', type: 'color', label: 'Kolor główny', default: '#ff36d1' },
+    { key: 'neonColor2', type: 'color', label: 'Kolor dodatkowy', default: '#ff007a' },
+    { key: 'intensity', type: 'number', label: 'Intensywność neonu (10-200)', min: 10, max: 200 },
+    { key: 'animationSpeed', type: 'number', label: 'Prędkość animacji (25-300)', min: 25, max: 300 },
     {
-      key: 'testDzwieku',
-      type: 'button',
-      label: 'Testuj dźwięk',
-      onClick(settings) {
-        this.playChime(settings.glosnosc, settings.wariantDzwieku);
-      },
-    },
-    {
-      key: 'trybWykrywania',
+      key: 'mapShader',
       type: 'select',
-      label: 'Tryb wykrywania',
+      label: 'Shader mapy',
       options: [
-        { value: 'tylko-legendarne', label: 'Tylko legendarne' },
-        { value: 'wszystkie-przedmioty', label: 'Wszystkie przedmioty w oknie łupu' },
+        { value: 'none', label: 'Brak' },
+        { value: 'cinematic', label: 'Cinematic' },
+        { value: 'glow', label: 'Glow' },
+        { value: 'cold', label: 'Cold' },
+        { value: 'warm', label: 'Warm' },
+        { value: 'dream', label: 'Dream' },
+        { value: 'dark', label: 'Dark' },
       ],
     },
-    { key: 'limitOdstepuSekundy', type: 'number', label: 'Minimalny odstęp między powiadomieniami (s)', min: 0, max: 60 },
-    { key: 'toast', type: 'boolean', label: 'Powiadomienie w grze (toast)' },
-    { key: 'kolorToastu', type: 'color', label: 'Kolor toastu', default: '#d4af37' },
-    { key: 'czasWyswietlaniaToastSekundy', type: 'number', label: 'Czas wyświetlania toastu (s)', min: 1, max: 30 },
-    { key: 'powiadomienieSystemowe', type: 'boolean', label: 'Powiadomienie systemowe przeglądarki' },
-
-    { key: 'obramowanieOknaLupu', type: 'boolean', label: 'Podświetlaj okno łupu' },
-    { key: 'obramowanieMapy', type: 'boolean', label: 'Podświetlaj mapę' },
-    {
-      key: 'stylObramowania',
-      type: 'select',
-      label: 'Styl obramowania',
-      options: [
-        { value: 'klasyczny', label: 'Klasyczny (poświata na zewnątrz)' },
-        { value: 'wewnetrzna-aura', label: 'Wewnętrzna aura' },
-        { value: 'linia-energii', label: 'Linia energii' },
-        { value: 'neon-80s', label: 'Neon 80s (podwójny)' },
-      ],
-    },
-    {
-      key: 'efektObramowania',
-      type: 'select',
-      label: 'Animacja',
-      options: [
-        { value: 'brak', label: 'Brak (statyczne)' },
-        { value: 'puls', label: 'Puls' },
-        { value: 'migotanie', label: 'Migotanie' },
-        { value: 'zmiana-kolorow', label: 'Zmiana kolorów (1→2→3)' },
-      ],
-    },
-    { key: 'intensywnoscObramowania', type: 'number', label: 'Intensywność pulsu (0-5)', min: 0, max: 5 },
-    { key: 'czasObramowaniaSekundy', type: 'number', label: 'Czas trwania obramowania (s)', min: 1, max: 30 },
-    {
-      key: 'testObramowania',
-      type: 'button',
-      label: 'Testuj obramowanie okna łupu',
-      onClick(settings) {
-        const target = document.querySelector(this.LOOT_WINDOW_SELECTOR) || document.body;
-        this.applyTimedGlow(target, settings);
-      },
-    },
-    {
-      key: 'testObramowaniaMapy',
-      type: 'button',
-      label: 'Testuj obramowanie mapy',
-      onClick(settings) {
-        const target = this.findMapElement() || document.body;
-        this.applyTimedGlow(target, settings);
-      },
-    },
-
-    { key: 'kolor1', type: 'color', label: 'Warstwa 1 - kolor', default: '#d4af37' },
-    { key: 'jasnosc1', type: 'number', label: 'Warstwa 1 - jasność (0-5)', min: 0, max: 5 },
-    { key: 'przezroczystosc1', type: 'number', label: 'Warstwa 1 - przezroczystość (0-5)', min: 0, max: 5 },
-    { key: 'szerokosc1', type: 'number', label: 'Warstwa 1 - szerokość (0-5)', min: 0, max: 5 },
-
-    { key: 'kolor2', type: 'color', label: 'Warstwa 2 - kolor', default: '#ffd700' },
-    { key: 'jasnosc2', type: 'number', label: 'Warstwa 2 - jasność (0-5)', min: 0, max: 5 },
-    { key: 'przezroczystosc2', type: 'number', label: 'Warstwa 2 - przezroczystość (0-5)', min: 0, max: 5 },
-    { key: 'szerokosc2', type: 'number', label: 'Warstwa 2 - szerokość (0-5)', min: 0, max: 5 },
-
-    { key: 'kolor3', type: 'color', label: 'Warstwa 3 - kolor', default: '#ff8c00' },
-    { key: 'jasnosc3', type: 'number', label: 'Warstwa 3 - jasność (0-5)', min: 0, max: 5 },
-    { key: 'przezroczystosc3', type: 'number', label: 'Warstwa 3 - przezroczystość (0-5)', min: 0, max: 5 },
-    { key: 'szerokosc3', type: 'number', label: 'Warstwa 3 - szerokość (0-5)', min: 0, max: 5 },
+    { key: 'mapZoom', type: 'boolean', label: 'Pulsacyjne przybliżenie mapy' },
   ],
 
-  LEGEND_SELECTOR: '[data-frame-mania-rarity="legendary"], [data-item-type="t-leg"]',
-  // Uwaga: brak potwierdzonego, uniwersalnego selektora "dowolnego przedmiotu" w oknie
-  // łupu - to najlepsze przybliżenie. Jeśli tryb "wszystkie przedmioty" nic nie łapie,
-  // trzeba będzie dopasować selektor do konkretnego serwera.
-  ALL_ITEMS_SELECTOR: '.loot-window .items-wrapper .item, [class*="loot-window"] [class*="item"]',
-  LOOT_WINDOW_SELECTOR: '.loot-wnd, .loot-window, [class*="loot-wnd"], [class*="loot-window"]',
-  MAP_SELECTORS: ['.map-wrapper', '.map-layer', '.game-window', '[class*="map-wrapper"]', '[class*="map-layer"]'],
+  EFFECT_DURATION: 60000,
+  MAP_CANVAS_SELECTOR: '#GAME_CANVAS',
+  LEGEND_SELECTOR: '[data-item-type="t-leg"],[data-frame-mania-rarity="legendary"]',
 
-  elementSignatures: null,
+  styleEl: null,
   observer: null,
-  pollTimer: null,
-  scanScheduled: false,
-  audioCtx: null,
-  lastNotifyTime: 0,
+  running: false,
+  checkScheduled: false,
+  lootOverlay: null,
+  mapOverlay: null,
+  textOverlay: null,
+  activeLootWindow: null,
+  cleanupTimer: null,
   currentSettings: null,
 
-  activeSelector(settings) {
-    return settings.trybWykrywania === 'wszystkie-przedmioty' ? this.ALL_ITEMS_SELECTOR : this.LEGEND_SELECTOR;
-  },
-
-  safeHex(value, fallback) {
-    return /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
-  },
-
-  clamp05(v) {
-    return Math.max(0, Math.min(5, Number(v) || 0));
-  },
-
-  hexToRgba(hex, alpha) {
-    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
-    if (!m) return `rgba(212,175,55,${alpha})`;
-    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
-  },
-
-  isVisible(el) {
-    const rect = el.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  },
-
-  findMapElement() {
-    for (const selector of this.MAP_SELECTORS) {
-      const el = document.querySelector(selector);
-      if (el && this.isVisible(el)) return el;
-    }
-    const canvases = Array.from(document.querySelectorAll('canvas'))
-      .map((c) => ({ c, rect: c.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.width >= 200 && rect.height >= 150)
-      .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height);
-    return canvases.length ? canvases[0].c : null;
-  },
-
   ensureStyles() {
-    if (document.getElementById('mal-nl-style')) return;
-    const style = document.createElement('style');
-    style.id = 'mal-nl-style';
-    style.textContent = `
-      #mal-nl-toast-wrap {
-        position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-        z-index: 999998; display: flex; flex-direction: column; gap: 8px; align-items: center;
-        pointer-events: none;
+    if (this.styleEl) return;
+    this.styleEl = document.createElement('style');
+    this.styleEl.id = 'mal-nl-style';
+    this.styleEl.textContent = `
+      @property --leg-chase-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+      .leg-neon-loot, .leg-neon-map {
+        position: fixed !important; pointer-events: none !important; box-sizing: border-box !important;
+        background: transparent !important; --leg-glow: 1; --leg-color-1: #ff36d1; --leg-color-2: #ff007a;
+        --leg-speed: 1; --leg-chase-angle: 0deg; z-index: 999996 !important; overflow: visible !important;
       }
-      .mal-nl-toast {
-        background: linear-gradient(135deg, #201a10, #14100a);
-        border: 1px solid var(--mal-nl-toast-color, #d4af37); color: #ffe9a8;
-        font: 600 13px/1.4 -apple-system, Segoe UI, sans-serif;
-        padding: 10px 18px; border-radius: 10px;
-        box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 18px var(--mal-nl-toast-glow, rgba(212,175,55,.35));
-        opacity: 0; transform: translateY(-8px); transition: opacity .25s ease, transform .25s ease;
+
+      .leg-mode-classic {
+        border: 2px solid var(--leg-color-1) !important; background: transparent !important;
+        box-shadow:
+          0 0 calc(1px * var(--leg-glow)) var(--leg-color-1),
+          0 0 calc(4px * var(--leg-glow)) var(--leg-color-1),
+          0 0 calc(9px * var(--leg-glow)) var(--leg-color-2),
+          0 0 calc(18px * var(--leg-glow)) var(--leg-color-2),
+          0 0 calc(30px * var(--leg-glow)) rgba(255,0,122,.20);
       }
-      .mal-nl-toast.mal-nl-show { opacity: 1; transform: translateY(0); }
+
+      .leg-mode-rainbow {
+        border: 2px solid transparent !important; background: transparent !important;
+        border-image: conic-gradient(#ff0000,#ff7a00,#ffff00,#00ff66,#00ffff,#0088ff,#7a00ff,#ff00ff,#ff0000) 1;
+        box-shadow:
+          0 0 calc(2px * var(--leg-glow)) rgba(255,255,255,.45),
+          0 0 calc(6px * var(--leg-glow)) rgba(255,0,255,.45),
+          0 0 calc(12px * var(--leg-glow)) rgba(0,255,255,.35);
+        animation: leg-rainbow-flow calc(6s / var(--leg-speed)) linear infinite;
+      }
+      @keyframes leg-rainbow-flow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+      .leg-mode-chase {
+        border: 0 !important; background: transparent !important;
+        box-shadow:
+          0 0 calc(1px * var(--leg-glow)) var(--leg-color-1),
+          0 0 calc(4px * var(--leg-glow)) var(--leg-color-1),
+          0 0 calc(9px * var(--leg-glow)) var(--leg-color-2),
+          0 0 calc(18px * var(--leg-glow)) var(--leg-color-2),
+          0 0 calc(28px * var(--leg-glow)) color-mix(in srgb, var(--leg-color-1) 35%, var(--leg-color-2));
+      }
+      .leg-mode-chase::before {
+        content: ""; position: absolute; inset: 0; box-sizing: border-box; border: 3px solid transparent; border-radius: inherit;
+        background:
+          linear-gradient(transparent, transparent) padding-box,
+          conic-gradient(from var(--leg-chase-angle),
+            var(--leg-color-1) 0deg,
+            color-mix(in srgb, var(--leg-color-1) 85%, var(--leg-color-2)) 30deg,
+            color-mix(in srgb, var(--leg-color-1) 65%, var(--leg-color-2)) 60deg,
+            color-mix(in srgb, var(--leg-color-1) 45%, var(--leg-color-2)) 90deg,
+            color-mix(in srgb, var(--leg-color-1) 25%, var(--leg-color-2)) 120deg,
+            var(--leg-color-2) 150deg,
+            color-mix(in srgb, var(--leg-color-2) 75%, var(--leg-color-1)) 180deg,
+            color-mix(in srgb, var(--leg-color-2) 55%, var(--leg-color-1)) 210deg,
+            color-mix(in srgb, var(--leg-color-2) 35%, var(--leg-color-1)) 240deg,
+            color-mix(in srgb, var(--leg-color-2) 15%, var(--leg-color-1)) 270deg,
+            var(--leg-color-1) 300deg,
+            color-mix(in srgb, var(--leg-color-1) 90%, var(--leg-color-2)) 330deg,
+            var(--leg-color-1) 360deg) border-box;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; z-index: 10;
+        animation: leg-chase-flow calc(3s / var(--leg-speed)) linear infinite;
+      }
+      .leg-mode-chase::after {
+        content: ""; position: absolute; inset: 0; box-sizing: border-box; border: 4px solid transparent; border-radius: inherit;
+        background:
+          linear-gradient(transparent, transparent) padding-box,
+          conic-gradient(from var(--leg-chase-angle),
+            var(--leg-color-1) 0deg,
+            color-mix(in srgb, var(--leg-color-1) 75%, var(--leg-color-2)) 35deg,
+            color-mix(in srgb, var(--leg-color-1) 50%, var(--leg-color-2)) 75deg,
+            color-mix(in srgb, var(--leg-color-1) 25%, var(--leg-color-2)) 115deg,
+            var(--leg-color-2) 150deg,
+            color-mix(in srgb, var(--leg-color-2) 70%, var(--leg-color-1)) 190deg,
+            color-mix(in srgb, var(--leg-color-2) 45%, var(--leg-color-1)) 230deg,
+            color-mix(in srgb, var(--leg-color-2) 20%, var(--leg-color-1)) 265deg,
+            var(--leg-color-1) 305deg,
+            color-mix(in srgb, var(--leg-color-1) 70%, var(--leg-color-2)) 340deg,
+            var(--leg-color-1) 360deg) border-box;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; z-index: 9;
+        filter: blur(calc(6px * var(--leg-glow))); opacity: .90;
+        animation: leg-chase-flow calc(3s / var(--leg-speed)) linear infinite;
+      }
+      @keyframes leg-chase-flow { from { --leg-chase-angle: 0deg; } to { --leg-chase-angle: 360deg; } }
+
+      .leg-neon-item {
+        --leg-color-1: #ff36d1; --leg-color-2: #ff007a; --leg-speed: 1;
+        animation: leg-item-pulse calc(.65s / var(--leg-speed)) ease-in-out infinite alternate !important;
+        filter:
+          drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px var(--leg-color-1))
+          drop-shadow(0 0 10px var(--leg-color-2)) drop-shadow(0 0 16px var(--leg-color-1)) !important;
+      }
+      @keyframes leg-item-pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+
+      .leg-neon-text {
+        position: fixed !important; left: 50% !important; top: 8% !important; transform: translateX(-50%) !important;
+        z-index: 999999 !important; pointer-events: none !important; color: #fff !important;
+        font-family: Arial, sans-serif !important; font-size: 32px !important; font-weight: 900 !important;
+        letter-spacing: 5px !important; white-space: nowrap !important;
+        --leg-color-1: #ff36d1; --leg-color-2: #ff007a; --leg-speed: 1;
+        text-shadow: 0 0 4px #fff, 0 0 8px var(--leg-color-1), 0 0 16px var(--leg-color-2), 0 0 28px var(--leg-color-1), 0 0 40px var(--leg-color-2);
+        animation: leg-text-in .35s ease-out, leg-text-pulse calc(.8s / var(--leg-speed)) ease-in-out infinite alternate;
+      }
+      @keyframes leg-text-in { from { opacity: 0; transform: translateX(-50%) scale(.5); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+      @keyframes leg-text-pulse { from { filter: brightness(.9); } to { filter: brightness(1.15); } }
+
+      #GAME_CANVAS.leg-shader-cinematic { filter: contrast(1.08) saturate(1.12) brightness(1.02); }
+      #GAME_CANVAS.leg-shader-glow { filter: brightness(1.08) saturate(1.18) contrast(1.04) drop-shadow(0 0 4px rgba(255,80,220,.20)); }
+      #GAME_CANVAS.leg-shader-cold { filter: saturate(.95) hue-rotate(12deg) brightness(1.02); }
+      #GAME_CANVAS.leg-shader-warm { filter: saturate(1.15) hue-rotate(-10deg) brightness(1.03); }
+      #GAME_CANVAS.leg-shader-dream { filter: brightness(1.08) saturate(1.12) contrast(.96) blur(.25px); }
+      #GAME_CANVAS.leg-shader-dark { filter: brightness(.82) contrast(1.16) saturate(1.05); }
+
+      #GAME_CANVAS.leg-map-zoom { transform-origin: center center; animation: leg-map-zoom-pulse calc(2.4s / var(--leg-speed)) ease-in-out infinite; }
+      @keyframes leg-map-zoom-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(this.styleEl);
   },
 
-  showToast(text, durationSeconds, color) {
-    this.ensureStyles();
-    let wrap = document.getElementById('mal-nl-toast-wrap');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'mal-nl-toast-wrap';
-      document.body.appendChild(wrap);
-    }
-    const hex = this.safeHex(color, '#d4af37');
-    const toast = document.createElement('div');
-    toast.className = 'mal-nl-toast';
-    toast.style.setProperty('--mal-nl-toast-color', hex);
-    toast.style.setProperty('--mal-nl-toast-glow', hex + '59');
-    toast.textContent = '✨ ' + text;
-    wrap.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('mal-nl-show'));
-    const durationMs = Math.max(1, Number(durationSeconds) || 5) * 1000;
-    setTimeout(() => {
-      toast.classList.remove('mal-nl-show');
-      setTimeout(() => toast.remove(), 300);
-    }, durationMs);
-  },
-
-  playChime(volumePercent, variant) {
-    try {
-      if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = this.audioCtx;
-      // Przeglądarki wstrzymują AudioContext dopóki strona nie miała żadnej interakcji
-      // użytkownika - bez tego dźwięk potrafi być cicho bez żadnego błędu w konsoli.
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      const now = ctx.currentTime;
-      const masterGain = ctx.createGain();
-      masterGain.gain.value = Math.max(0, Math.min(1, (Number(volumePercent) || 0) / 100)) * 0.4;
-      masterGain.connect(ctx.destination);
-
-      const note = (freq, start, dur, type) => {
-        const osc = ctx.createOscillator();
-        osc.type = type || 'sine';
-        osc.frequency.value = freq;
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0, now + start);
-        gain.gain.linearRampToValueAtTime(1, now + start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-        osc.connect(gain).connect(masterGain);
-        osc.start(now + start);
-        osc.stop(now + start + dur + 0.05);
-      };
-
-      switch (variant) {
-        case 'fanfary':
-          note(523.25, 0, 0.25);
-          note(659.25, 0.12, 0.25);
-          note(783.99, 0.24, 0.5, 'triangle');
-          break;
-        case 'gong':
-          note(196, 0, 1.4);
-          note(98, 0, 1.6);
-          break;
-        case 'arpeggio':
-          [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => note(freq, i * 0.08, 0.3));
-          break;
-        case 'puls':
-          note(440, 0, 0.15, 'square');
-          note(440, 0.2, 0.15, 'square');
-          note(440, 0.4, 0.25, 'square');
-          break;
-        case 'dzwoneczek':
-        default:
-          [880, 1318.5, 1760].forEach((freq, i) => note(freq, i * 0.12, 0.5));
-      }
-    } catch (err) {
-      console.error('[MAL:notyfikator-legend] Nie udało się odtworzyć dźwięku:', err);
-    }
-  },
-
-  buildShadow(settings) {
-    const layers = [1, 2, 3]
-      .map((i) => ({
-        color: this.safeHex(settings['kolor' + i], '#d4af37'),
-        glow: this.clamp05(settings['jasnosc' + i]),
-        opacity: this.clamp05(settings['przezroczystosc' + i]) / 5,
-        width: this.clamp05(settings['szerokosc' + i]),
-      }))
-      .filter((l) => l.glow > 0 && l.opacity > 0 && l.width > 0);
-    if (!layers.length) return 'none';
-
-    const style = settings.stylObramowania;
-    const inset = style === 'wewnetrzna-aura' || style === 'neon-80s' ? 'inset ' : '';
-    const layerShadow = (l) =>
-      `${inset}0 0 ${Math.round(6 + l.glow * 4 + l.width * 3)}px ${(1 + l.width * 1.5).toFixed(1)}px ${this.hexToRgba(l.color, l.opacity)}`;
-
-    const parts = layers.map(layerShadow);
-    if (style === 'neon-80s') {
-      parts.unshift('0 0 3px 0 rgba(255,255,255,.92)', 'inset 0 0 3px 0 rgba(255,255,255,.92)');
-      layers.forEach((l) =>
-        parts.push(`0 0 ${Math.round(6 + l.glow * 4 + l.width * 3)}px ${(1 + l.width * 1.5).toFixed(1)}px ${this.hexToRgba(l.color, l.opacity)}`)
-      );
-    } else if (style === 'linia-energii') {
-      parts.unshift('0 0 3px 0 rgba(255,255,255,.92)');
-    }
-    return parts.join(', ');
-  },
-
-  rotateColorLayers(settings) {
-    return Object.assign({}, settings, {
-      kolor1: settings.kolor2,
-      kolor2: settings.kolor3,
-      kolor3: settings.kolor1,
-      jasnosc1: settings.jasnosc2,
-      jasnosc2: settings.jasnosc3,
-      jasnosc3: settings.jasnosc1,
-      przezroczystosc1: settings.przezroczystosc2,
-      przezroczystosc2: settings.przezroczystosc3,
-      przezroczystosc3: settings.przezroczystosc1,
-      szerokosc1: settings.szerokosc2,
-      szerokosc2: settings.szerokosc3,
-      szerokosc3: settings.szerokosc1,
+  getVisibleLootWindows() {
+    return Array.from(document.querySelectorAll('.loot-wnd')).filter((element) => {
+      const computed = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return computed.display !== 'none' && computed.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
     });
   },
 
-  applyGlowToElement(el, settings) {
-    if (!el) return;
-    el.getAnimations?.().forEach((a) => a.cancel());
-    const shadow = this.buildShadow(settings);
-    el.style.boxShadow = shadow;
-    if (shadow === 'none' || settings.efektObramowania === 'brak') return;
+  isLegendaryWindow(windowElement) {
+    if (!windowElement) return false;
+    return !!windowElement.querySelector(this.LEGEND_SELECTOR);
+  },
 
-    const level = this.clamp05(settings.intensywnoscObramowania);
-    if (settings.efektObramowania === 'puls') {
-      const duration = { 0: 2800, 1: 2800, 2: 2100, 3: 1500, 4: 1000, 5: 650 }[level];
-      el.animate([{ boxShadow: shadow, opacity: 1 }, { boxShadow: shadow, opacity: 0.7 }], {
-        duration,
-        iterations: Infinity,
-        direction: 'alternate',
-        easing: 'ease-in-out',
-      });
-    } else if (settings.efektObramowania === 'migotanie') {
-      el.animate(
-        [
-          { opacity: 1, offset: 0 },
-          { opacity: 0.7, offset: 0.17 },
-          { opacity: 1, offset: 0.31 },
-          { opacity: 0.8, offset: 0.5 },
-          { opacity: 1, offset: 0.7 },
-          { opacity: 0.85, offset: 0.85 },
-          { opacity: 1, offset: 1 },
-        ],
-        { duration: 1800, iterations: Infinity, easing: 'ease-in-out' }
-      );
-    } else if (settings.efektObramowania === 'zmiana-kolorow') {
-      const s2 = this.rotateColorLayers(settings);
-      const s3 = this.rotateColorLayers(s2);
-      el.animate(
-        [{ boxShadow: shadow }, { boxShadow: this.buildShadow(s2) }, { boxShadow: this.buildShadow(s3) }, { boxShadow: shadow }],
-        { duration: 2200, iterations: Infinity, easing: 'linear' }
-      );
+  findLegendaryWindow() {
+    return this.getVisibleLootWindows().find((w) => this.isLegendaryWindow(w)) || null;
+  },
+
+  getGameCanvas() {
+    return document.querySelector(this.MAP_CANVAS_SELECTOR);
+  },
+
+  applyMapShader(settings) {
+    const canvas = this.getGameCanvas();
+    if (!canvas) return;
+    canvas.classList.remove('leg-shader-cinematic', 'leg-shader-glow', 'leg-shader-cold', 'leg-shader-warm', 'leg-shader-dream', 'leg-shader-dark', 'leg-map-zoom');
+    if (settings.mapShader !== 'none') canvas.classList.add('leg-shader-' + settings.mapShader);
+    if (settings.mapZoom) canvas.classList.add('leg-map-zoom');
+  },
+
+  positionMapOverlay() {
+    if (!this.mapOverlay) return;
+    const canvas = this.getGameCanvas();
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    this.mapOverlay.style.left = rect.left - 4 + 'px';
+    this.mapOverlay.style.top = rect.top - 4 + 'px';
+    this.mapOverlay.style.width = rect.width + 8 + 'px';
+    this.mapOverlay.style.height = rect.height + 8 + 'px';
+  },
+
+  positionLootOverlay() {
+    if (!this.lootOverlay || !this.activeLootWindow || !this.activeLootWindow.isConnected) return;
+    const rect = this.activeLootWindow.getBoundingClientRect();
+    this.lootOverlay.style.left = rect.left - 5 + 'px';
+    this.lootOverlay.style.top = rect.top - 5 + 'px';
+    this.lootOverlay.style.width = rect.width + 10 + 'px';
+    this.lootOverlay.style.height = rect.height + 10 + 'px';
+  },
+
+  applyNeonMode(settings) {
+    [this.lootOverlay, this.mapOverlay].forEach((overlay) => {
+      if (!overlay) return;
+      overlay.classList.remove('leg-mode-classic', 'leg-mode-rainbow', 'leg-mode-chase');
+      overlay.classList.add(settings.neonMode === 'rainbow' ? 'leg-mode-rainbow' : settings.neonMode === 'chase' ? 'leg-mode-chase' : 'leg-mode-classic');
+    });
+  },
+
+  applyIntensity(settings) {
+    const glow = Math.max(0.03, Math.min(2, Number(settings.intensity || 100) / 100));
+    if (this.lootOverlay) this.lootOverlay.style.setProperty('--leg-glow', glow);
+    if (this.mapOverlay) this.mapOverlay.style.setProperty('--leg-glow', glow);
+  },
+
+  applyAnimationSpeed(settings) {
+    const speed = Math.max(25, Math.min(300, Number(settings.animationSpeed || 100))) / 100;
+    [this.lootOverlay, this.mapOverlay, this.textOverlay].forEach((el) => el && el.style.setProperty('--leg-speed', speed));
+    if (this.activeLootWindow) {
+      this.activeLootWindow.querySelectorAll('.leg-neon-item').forEach((item) => item.style.setProperty('--leg-speed', speed));
     }
   },
 
-  applyTimedGlow(el, settings) {
-    if (!el) return;
-    this.ensureStyles();
-    this.applyGlowToElement(el, settings);
-    clearTimeout(el._malNlGlowTimeout);
-    const durationMs = Math.max(1, Number(settings.czasObramowaniaSekundy) || 4) * 1000;
-    el._malNlGlowTimeout = setTimeout(() => {
-      el.getAnimations?.().forEach((a) => a.cancel());
-      el.style.boxShadow = '';
-    }, durationMs);
+  applyColors(settings) {
+    const color1 = settings.neonColor1 || '#ff36d1';
+    const color2 = settings.neonColor2 || '#ff007a';
+    [this.lootOverlay, this.mapOverlay, this.textOverlay].forEach((el) => {
+      if (!el) return;
+      el.style.setProperty('--leg-color-1', color1);
+      el.style.setProperty('--leg-color-2', color2);
+    });
+    if (this.activeLootWindow) {
+      this.activeLootWindow.querySelectorAll('.leg-neon-item').forEach((item) => {
+        item.style.setProperty('--leg-color-1', color1);
+        item.style.setProperty('--leg-color-2', color2);
+      });
+    }
   },
 
-  applyLootGlow(itemOrWindowEl, settings) {
-    if (!settings.obramowanieOknaLupu || !itemOrWindowEl) return;
-    const windowEl = itemOrWindowEl.matches?.(this.LOOT_WINDOW_SELECTOR)
-      ? itemOrWindowEl
-      : itemOrWindowEl.closest?.(this.LOOT_WINDOW_SELECTOR);
-    if (!windowEl) return;
-    this.applyTimedGlow(windowEl, settings);
-  },
-
-  applyMapGlow(settings) {
-    if (!settings.obramowanieMapy) return;
-    const mapEl = this.findMapElement();
-    if (!mapEl) {
-      console.warn('[MAL:notyfikator-legend] Nie znaleziono elementu mapy do podświetlenia.');
+  createEffects(windowElement, settings) {
+    if (this.activeLootWindow === windowElement) {
+      this.applyIntensity(settings);
+      this.applyAnimationSpeed(settings);
+      this.applyColors(settings);
+      this.applyNeonMode(settings);
+      this.applyMapShader(settings);
+      this.positionLootOverlay();
+      this.positionMapOverlay();
       return;
     }
-    this.applyTimedGlow(mapEl, settings);
+
+    this.removeEffects();
+    this.activeLootWindow = windowElement;
+
+    if (settings.lootGlow) {
+      this.lootOverlay = document.createElement('div');
+      this.lootOverlay.className = 'leg-neon-loot';
+      document.body.appendChild(this.lootOverlay);
+    }
+    if (settings.mapGlow) {
+      this.mapOverlay = document.createElement('div');
+      this.mapOverlay.className = 'leg-neon-map';
+      document.body.appendChild(this.mapOverlay);
+    }
+    if (settings.legendaryText) {
+      this.textOverlay = document.createElement('div');
+      this.textOverlay.className = 'leg-neon-text';
+      this.textOverlay.textContent = settings.legendaryTextValue || '✦ LEGENDARY DROP ✦';
+      document.body.appendChild(this.textOverlay);
+    }
+    if (settings.itemGlow) {
+      const item = windowElement.querySelector(this.LEGEND_SELECTOR);
+      if (item) item.classList.add('leg-neon-item');
+    }
+
+    this.applyIntensity(settings);
+    this.applyAnimationSpeed(settings);
+    this.applyColors(settings);
+    this.applyNeonMode(settings);
+    this.applyMapShader(settings);
+    this.positionLootOverlay();
+    this.positionMapOverlay();
+
+    clearTimeout(this.cleanupTimer);
+    this.cleanupTimer = setTimeout(() => this.removeEffects(), this.EFFECT_DURATION);
   },
 
-  extractItemName(el) {
-    const candidate =
-      el.getAttribute('data-tip') ||
-      el.getAttribute('title') ||
-      el.getAttribute('alt') ||
-      el.getAttribute('aria-label') ||
-      (el.querySelector('img') && el.querySelector('img').getAttribute('alt')) ||
-      el.closest('[title]')?.getAttribute('title') ||
-      el.textContent;
-    const cleaned = (candidate || '').replace(/\s+/g, ' ').trim();
-    return cleaned || 'Nieznany przedmiot';
+  removeEffects() {
+    clearTimeout(this.cleanupTimer);
+    this.cleanupTimer = null;
+
+    if (this.activeLootWindow) {
+      this.activeLootWindow.querySelectorAll('.leg-neon-item').forEach((item) => {
+        item.classList.remove('leg-neon-item');
+        item.style.removeProperty('--leg-color-1');
+        item.style.removeProperty('--leg-color-2');
+        item.style.removeProperty('--leg-speed');
+      });
+    }
+    if (this.lootOverlay) {
+      this.lootOverlay.remove();
+      this.lootOverlay = null;
+    }
+    if (this.mapOverlay) {
+      this.mapOverlay.remove();
+      this.mapOverlay = null;
+    }
+    if (this.textOverlay) {
+      this.textOverlay.remove();
+      this.textOverlay = null;
+    }
+    const canvas = this.getGameCanvas();
+    if (canvas) canvas.classList.remove('leg-shader-cinematic', 'leg-shader-glow', 'leg-shader-cold', 'leg-shader-warm', 'leg-shader-dream', 'leg-shader-dark', 'leg-map-zoom');
+    this.activeLootWindow = null;
   },
 
-  // Sygnatura treści (nie referencja do elementu!) - Margonem może recyklingować sloty
-  // w oknie łupu, czyli podmieniać atrybuty na JUŻ ISTNIEJĄCYM elemencie zamiast tworzyć
-  // nowy. WeakSet po samym elemencie zablokowałby wtedy powiadomienia na zawsze po
-  // pierwszym trafieniu w dany slot. Tu porównujemy zawartość, więc zmiana przedmiotu
-  // w tym samym slocie też wywoła nowe powiadomienie.
-  getSignature(el) {
-    return (
-      (el.getAttribute('data-item-type') || '') +
-      '|' +
-      (el.getAttribute('data-frame-mania-rarity') || '') +
-      '|' +
-      this.extractItemName(el)
-    );
+  checkLoot() {
+    const settings = this.currentSettings;
+    const legendaryWindow = this.findLegendaryWindow();
+    if (legendaryWindow) this.createEffects(legendaryWindow, settings);
+    else if (this.activeLootWindow) this.removeEffects();
   },
 
-  handleLegendaryElement(el, settings) {
-    const signature = this.getSignature(el);
-    if (this.elementSignatures.get(el) === signature) return;
-    this.elementSignatures.set(el, signature);
+  scheduleCheck() {
+    if (this.checkScheduled) return;
+    this.checkScheduled = true;
+    requestAnimationFrame(() => {
+      this.checkScheduled = false;
+      this.checkLoot();
+    });
+  },
 
-    const now = Date.now();
-    const cooldownMs = Math.max(0, Number(settings.limitOdstepuSekundy) || 0) * 1000;
-    if (this.lastNotifyTime && now - this.lastNotifyTime < cooldownMs) return;
-    this.lastNotifyTime = now;
-
-    const name = this.extractItemName(el);
-    const label = settings.trybWykrywania === 'wszystkie-przedmioty' ? 'Nowy przedmiot: ' + name : 'Legendarny przedmiot: ' + name;
-
-    if (settings.toast) this.showToast(label, settings.czasWyswietlaniaToastSekundy, settings.kolorToastu);
-    if (settings.dzwiek) this.playChime(settings.glosnosc, settings.wariantDzwieku);
-    this.applyLootGlow(el, settings);
-    this.applyMapGlow(settings);
-    if (settings.powiadomienieSystemowe && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification('Notyfikator legend', { body: label });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
+  animationLoop() {
+    if (!this.running) return;
+    if (this.activeLootWindow) {
+      if (!this.activeLootWindow.isConnected || !this.isLegendaryWindow(this.activeLootWindow)) {
+        this.removeEffects();
+      } else {
+        this.positionLootOverlay();
+        this.positionMapOverlay();
       }
     }
-  },
-
-  scanAll(settings) {
-    document.querySelectorAll(this.activeSelector(settings)).forEach((el) => this.handleLegendaryElement(el, settings));
-  },
-
-  // Dokładnie ich technika z panel.js (core/events-and-panel.js): jeden szeroki
-  // MutationObserver na całym body, a przy KAŻDEJ mutacji (dodanie węzła LUB zmiana
-  // atrybutu rzadkości/typu przedmiotu) planujemy pełne przeskanowanie w najbliższej
-  // klatce przez requestAnimationFrame - debounce, żeby seria mutacji w jednej klatce
-  // dała jedno skanowanie, nie dziesiątki. To realny mechanizm z ich kodu, nie zgadywany.
-  scheduleScan() {
-    if (this.scanScheduled) return;
-    this.scanScheduled = true;
-    requestAnimationFrame(() => {
-      this.scanScheduled = false;
-      this.scanAll(this.currentSettings);
-    });
+    requestAnimationFrame(() => this.animationLoop());
   },
 
   onEnable(settings) {
-    this.elementSignatures = new WeakMap();
+    this.ensureStyles();
     this.currentSettings = settings;
-    this.lastNotifyTime = 0;
-    this.scanScheduled = false;
+    this.running = true;
+    this.checkScheduled = false;
 
-    // Stan początkowy zapisujemy po cichu (bez powiadomienia) - interesują nas tylko
-    // zmiany od teraz, nie to co już jest w oknie łupu w chwili włączenia dodatku.
-    document.querySelectorAll(this.activeSelector(settings)).forEach((el) => {
-      this.elementSignatures.set(el, this.getSignature(el));
-    });
-
-    this.observer = new MutationObserver(() => this.scheduleScan());
+    this.observer = new MutationObserver(() => this.scheduleCheck());
     this.observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['data-item-type', 'data-frame-mania-rarity'],
+      attributeFilter: ['data-item-type', 'data-frame-mania-rarity', 'class'],
     });
 
-    // Zapasowe okresowe skanowanie na wypadek, gdyby gra aktualizowała DOM w sposób,
-    // którego nawet ten obserwator z jakiegoś powodu nie złapie.
-    this.pollTimer = setInterval(() => this.scanAll(this.currentSettings), 1500);
+    this.animationLoop();
+    this.scheduleCheck();
   },
 
   onDisable() {
+    this.running = false;
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
     }
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
+    this.removeEffects();
   },
 
-  onSettingsChange(settings) {
+  onSettingsChange(settings, key) {
     this.currentSettings = settings;
+    if (['lootGlow', 'mapGlow', 'itemGlow', 'legendaryText'].includes(key)) {
+      this.removeEffects();
+      this.scheduleCheck();
+      return;
+    }
+    if (key === 'neonMode') {
+      this.applyNeonMode(settings);
+      this.applyAnimationSpeed(settings);
+      this.applyIntensity(settings);
+      return;
+    }
+    if (key === 'mapShader' || key === 'mapZoom') {
+      if (this.activeLootWindow) this.applyMapShader(settings);
+      return;
+    }
+    if (key === 'animationSpeed') {
+      this.applyAnimationSpeed(settings);
+      return;
+    }
+    if (key === 'intensity') {
+      this.applyIntensity(settings);
+      return;
+    }
+    if (key === 'legendaryTextValue') {
+      if (this.textOverlay) this.textOverlay.textContent = settings.legendaryTextValue;
+      return;
+    }
+    if (key === 'neonColor1' || key === 'neonColor2') {
+      this.applyColors(settings);
+    }
   },
 });
