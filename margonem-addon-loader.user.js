@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Margonem Addon Loader
 // @namespace    margonem-addon-loader
-// @version      1.4.0
+// @version      1.5.0
 // @description  Minimalistyczny, ciemny panel do zarządzania dodatkami Margonem. Sam w sobie nic nie robi - jest bazą, do której podpinają się przyszłe dodatki.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -130,14 +130,14 @@
     #mal-toggle-btn {
       position: relative; width: 46px; height: 46px; border-radius: 50%;
       background: #1c1d21; border: 1px solid rgba(255,255,255,0.08);
-      color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--mal-accent, #6d4fe0); cursor: pointer; display: flex; align-items: center; justify-content: center;
       box-shadow: 0 4px 16px rgba(0,0,0,0.4);
       transition: transform .15s ease, background .15s ease, color .15s ease;
     }
-    #mal-toggle-btn:hover { background: #24252b; color: #c4b5fd; transform: translateY(-1px); }
+    #mal-toggle-btn:hover { background: #24252b; transform: translateY(-1px); }
     #mal-toggle-btn .mal-badge {
       position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px;
-      border-radius: 8px; background: #7c5cff; color: #fff; font-size: 10px; line-height: 16px;
+      border-radius: 8px; background: var(--mal-accent, #6d4fe0); color: #fff; font-size: 10px; line-height: 16px;
       text-align: center; font-weight: 600;
     }
     #mal-backdrop {
@@ -179,13 +179,14 @@
     }
     .mal-tab:hover { background: #1f2025; }
     .mal-tab.mal-active { background: #24252b; }
+    .mal-tab-core { border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; padding-bottom: 9px; }
     .mal-tab-name {
       flex: 1; min-width: 0; font-size: 12px; font-weight: 500; opacity: .8;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mal-tab.mal-active .mal-tab-name { opacity: 1; }
     .mal-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #3a3b42; flex-shrink: 0; }
-    .mal-tab-dot.mal-on { background: #6d4fe0; box-shadow: 0 0 6px rgba(109,79,224,.7); }
+    .mal-tab-dot.mal-on { background: var(--mal-accent, #6d4fe0); box-shadow: 0 0 6px var(--mal-accent, #6d4fe0); }
     .mal-content { flex: 1; overflow-y: auto; padding: 20px 22px; }
     .mal-content-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
     .mal-content-title { font-size: 16px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
@@ -201,9 +202,9 @@
       border-radius: 7px; padding: 7px 9px; font-size: 12.5px; outline: none;
       transition: border-color .15s ease;
     }
-    .mal-input:focus, .mal-select:focus { border-color: #6d4fe0; }
+    .mal-input:focus, .mal-select:focus { border-color: var(--mal-accent, #6d4fe0); }
     .mal-btn {
-      align-self: flex-start; background: #26232f; border: 1px solid rgba(109,79,224,.4); color: #cbb9ff;
+      align-self: flex-start; background: #26232f; border: 1px solid var(--mal-accent, #6d4fe0); color: var(--mal-accent, #6d4fe0);
       padding: 7px 14px; border-radius: 7px; font-size: 12px; cursor: pointer; transition: background .15s ease;
     }
     .mal-btn:hover { background: #312c40; }
@@ -241,7 +242,7 @@
       content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px;
       background: #cfcfd6; border-radius: 50%; transition: transform .15s ease, background .15s ease;
     }
-    .mal-switch input:checked + .mal-switch-track { background: #6d4fe0; }
+    .mal-switch input:checked + .mal-switch-track { background: var(--mal-accent, #6d4fe0); }
     .mal-switch input:checked + .mal-switch-track::before { transform: translateX(14px); background: #fff; }
     .mal-switch.small { width: 28px; height: 16px; }
     .mal-switch.small .mal-switch-track::before { width: 12px; height: 12px; left: 2px; top: 2px; }
@@ -256,7 +257,14 @@
     countEl: null,
     badgeEl: null,
     backdrop: null,
+    rootEl: null,
+    modalEl: null,
   };
+
+  function applyAccentColor(hex) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return;
+    document.documentElement.style.setProperty('--mal-accent', hex);
+  }
 
   function renderField(record, field) {
     if (field.type === 'button') {
@@ -329,8 +337,9 @@
   }
 
   function updateCount() {
-    const total = state.addons.size;
-    const enabled = Array.from(state.addons.values()).filter((r) => r.enabled).length;
+    const real = Array.from(state.addons.values()).filter((r) => !r.config.isCore);
+    const total = real.length;
+    const enabled = real.filter((r) => r.enabled).length;
     if (state.countEl) state.countEl.textContent = enabled + '/' + total;
     if (state.badgeEl) {
       state.badgeEl.textContent = String(enabled);
@@ -341,13 +350,19 @@
   function renderTabs() {
     state.tabsEl.textContent = '';
     state.addons.forEach((record) => {
-      const dot = el('span', { class: 'mal-tab-dot' + (record.enabled ? ' mal-on' : '') });
-      const name = el('span', { class: 'mal-tab-name' }, [record.config.name || record.id]);
-      const children = [dot, name];
+      const children = [];
+      if (!record.config.isCore) {
+        children.push(el('span', { class: 'mal-tab-dot' + (record.enabled ? ' mal-on' : '') }));
+      }
+      children.push(el('span', { class: 'mal-tab-name' }, [record.config.name || record.id]));
       if (record.updateAvailable) {
         children.push(el('span', { class: 'mal-tab-update', title: 'Dostępna aktualizacja' }, ['●']));
       }
-      const tab = el('div', { class: 'mal-tab' + (record.id === state.activeId ? ' mal-active' : '') }, children);
+      const tab = el(
+        'div',
+        { class: 'mal-tab' + (record.id === state.activeId ? ' mal-active' : '') + (record.config.isCore ? ' mal-tab-core' : '') },
+        children
+      );
       tab.addEventListener('click', () => selectTab(record.id));
       state.tabsEl.appendChild(tab);
     });
@@ -416,13 +431,16 @@
       return;
     }
 
-    const enabledInput = el('input', { type: 'checkbox' });
-    enabledInput.checked = record.enabled;
-    enabledInput.addEventListener('change', () => toggleAddon(record, enabledInput.checked));
-    const enabledSwitch = el('label', { class: 'mal-switch mal-content-switch' }, [
-      enabledInput,
-      el('span', { class: 'mal-switch-track' }),
-    ]);
+    let enabledSwitch = null;
+    if (!record.config.isCore) {
+      const enabledInput = el('input', { type: 'checkbox' });
+      enabledInput.checked = record.enabled;
+      enabledInput.addEventListener('change', () => toggleAddon(record, enabledInput.checked));
+      enabledSwitch = el('label', { class: 'mal-switch mal-content-switch' }, [
+        enabledInput,
+        el('span', { class: 'mal-switch-track' }),
+      ]);
+    }
 
     const header = el('div', { class: 'mal-content-header' }, [
       el('div', {}, [
@@ -571,7 +589,7 @@
     const tabsEl = el('div', { class: 'mal-tabs' });
     const contentEl = el('div', { class: 'mal-content' });
     const body = el('div', { class: 'mal-modal-body' }, [tabsEl, contentEl]);
-    const footer = el('div', { class: 'mal-modal-footer' }, ['Margonem Addon Loader v1.4.0']);
+    const footer = el('div', { class: 'mal-modal-footer' }, ['Margonem Addon Loader v1.5.0']);
     const modal = el('div', { id: 'mal-modal' }, [header, body, footer]);
 
     backdrop.appendChild(modal);
@@ -602,8 +620,111 @@
     state.countEl = countEl;
     state.badgeEl = badgeEl;
     state.backdrop = backdrop;
+    state.rootEl = root;
+    state.modalEl = modal;
 
     renderContent(null);
+  }
+
+  function registerCoreSettings() {
+    registerAddon({
+      id: '__loader__',
+      name: 'Ustawienia loadera',
+      description: 'Wygląd i zachowanie samego panelu. Skrót Alt+M otwiera/zamyka panel.',
+      isCore: true,
+      defaultEnabled: true,
+      defaultSettings: {
+        kolorAkcentu: '#6d4fe0',
+        autoOtwieranie: false,
+      },
+      settingsSchema: [
+        { key: 'kolorAkcentu', type: 'color', label: 'Kolor akcentu interfejsu', default: '#6d4fe0' },
+        { key: 'autoOtwieranie', type: 'boolean', label: 'Otwieraj panel automatycznie po wczytaniu strony' },
+        {
+          key: 'resetPozycji',
+          type: 'button',
+          label: 'Zresetuj pozycję okna i przycisku',
+          onClick() {
+            localStorage.removeItem(STORAGE_PREFIX + 'ui:button-pos');
+            localStorage.removeItem(STORAGE_PREFIX + 'ui:modal-pos');
+            [state.rootEl, state.modalEl].forEach((node) => {
+              if (!node) return;
+              ['position', 'left', 'top', 'right', 'bottom', 'margin'].forEach((prop) => node.style.removeProperty(prop));
+            });
+          },
+        },
+        {
+          key: 'eksportUstawien',
+          type: 'button',
+          label: 'Eksportuj wszystkie ustawienia (plik JSON)',
+          onClick() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith(STORAGE_PREFIX)) data[key] = localStorage.getItem(key);
+            }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'margonem-addon-loader-ustawienia.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+          },
+        },
+        {
+          key: 'importUstawien',
+          type: 'button',
+          label: 'Importuj ustawienia z pliku',
+          onClick() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.addEventListener('change', () => {
+              const file = input.files && input.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                try {
+                  const data = JSON.parse(String(reader.result));
+                  Object.keys(data).forEach((key) => {
+                    if (key.startsWith(STORAGE_PREFIX)) localStorage.setItem(key, data[key]);
+                  });
+                  alert('Zaimportowano ustawienia. Odśwież stronę, żeby zaczęły działać.');
+                } catch (err) {
+                  alert('Nieprawidłowy plik ustawień.');
+                }
+              };
+              reader.readAsText(file);
+            });
+            input.click();
+          },
+        },
+        {
+          key: 'resetWszystkiego',
+          type: 'button',
+          label: 'Zresetuj wszystkie ustawienia dodatków',
+          onClick() {
+            if (!confirm('Na pewno zresetować WSZYSTKIE ustawienia wszystkich dodatków? Tej operacji nie można cofnąć.')) return;
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key);
+            }
+            keys.forEach((key) => localStorage.removeItem(key));
+            alert('Zresetowano. Odśwież stronę.');
+          },
+        },
+      ],
+      onEnable(settings) {
+        applyAccentColor(settings.kolorAkcentu);
+      },
+      onSettingsChange(settings, key) {
+        if (key === 'kolorAkcentu') applyAccentColor(settings.kolorAkcentu);
+      },
+    });
   }
 
   function registerAddon(config) {
@@ -629,12 +750,21 @@
 
   function init() {
     ensureUI();
+    registerCoreSettings();
     const pending = window.__MAL_PENDING__;
     window.MAL = { registerAddon };
     if (Array.isArray(pending)) {
       pending.forEach(registerAddon);
       pending.length = 0;
     }
+    const core = state.addons.get('__loader__');
+    if (core && core.settings.autoOtwieranie) state.backdrop.classList.add('mal-open');
+    document.addEventListener('keydown', (e) => {
+      if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        state.backdrop.classList.toggle('mal-open');
+      }
+    });
     log('Loader gotowy.');
   }
 
