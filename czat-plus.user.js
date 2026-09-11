@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MAL - Czat plus
 // @namespace    margonem-addon-loader
-// @version      1.0.1
+// @version      1.1.0
 // @description  Znaczniki czasu, klikalne linki i podświetlanie wzmianek na czacie.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
@@ -18,13 +18,14 @@
 })({
   id: 'czat-plus',
   name: 'Czat plus',
-  description: 'Znaczniki czasu, klikalne odnośniki i podświetlanie wzmianek Twojego nicku.',
-  version: '1.0.1',
+  description: 'Znaczniki czasu, klikalne odnośniki, emotki i podświetlanie wzmianek Twojego nicku.',
+  version: '1.1.0',
   updateCheckUrl: 'https://raw.githubusercontent.com/Harkryn/Harkdonz/main/czat-plus.user.js',
   defaultEnabled: false,
   defaultSettings: {
     znacznikCzasu: true,
     klikalneLinki: true,
+    emotkiWlaczone: true,
     podswietlanieWzmianek: true,
     mojNick: '',
     dzwiekWzmianki: true,
@@ -32,6 +33,7 @@
   settingsSchema: [
     { key: 'znacznikCzasu', type: 'boolean', label: 'Dodawaj znacznik czasu do wiadomości' },
     { key: 'klikalneLinki', type: 'boolean', label: 'Zamieniaj linki na klikalne' },
+    { key: 'emotkiWlaczone', type: 'boolean', label: 'Zamieniaj :emotki: na emoji' },
     { key: 'podswietlanieWzmianek', type: 'boolean', label: 'Podświetlaj wzmianki Twojego nicku' },
     { key: 'mojNick', type: 'text', label: 'Twój nick (do wzmianek)', placeholder: 'Twoja postać' },
     { key: 'dzwiekWzmianki', type: 'boolean', label: 'Dźwięk przy wzmiance' },
@@ -39,6 +41,37 @@
 
   CHAT_ROOT_SELECTOR: '[class*="chat"], [class*="Chat"], [id*="chat"], [id*="Chat"]',
   URL_RE: /\bhttps?:\/\/[^\s<>"']+/gi,
+  EMOTICON_TOKEN_RE: /:([a-z0-9_]+):/gi,
+  // Odpowiednik katalogu emotek z czat.js Shacala - tam to obrazki z ich CDN, których nie
+  // mamy prawa używać, więc zamiast tego stawiamy na uniwersalne unicode emoji (zero
+  // zewnętrznych zasobów, zero problemów z prawami).
+  EMOTICONS: {
+    usmiech: '😊',
+    smiech: '😂',
+    oko: '😉',
+    serce: '❤️',
+    zlosc: '😠',
+    placz: '😭',
+    super: '😎',
+    ok: '👌',
+    gora: '👍',
+    dol: '👎',
+    ogien: '🔥',
+    gwiazda: '⭐',
+    puchar: '🏆',
+    miecz: '⚔️',
+    tarcza: '🛡️',
+    czaszka: '💀',
+    gg: '🎮',
+    hej: '👋',
+    pa: '🖐️',
+    myslenie: '🤔',
+    clap: '👏',
+    impreza: '🎉',
+    legenda: '✨',
+    zloto: '💰',
+    boss: '👹',
+  },
   observer: null,
   processed: null,
   audioCtx: null,
@@ -129,6 +162,32 @@
     textNode.replaceWith(fragment);
   },
 
+  renderEmoticonsInTextNode(textNode) {
+    const text = textNode.nodeValue || '';
+    if (!text.includes(':')) return;
+    this.EMOTICON_TOKEN_RE.lastIndex = 0;
+    let match;
+    let found = false;
+    let lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    while ((match = this.EMOTICON_TOKEN_RE.exec(text))) {
+      const emoji = this.EMOTICONS[match[1].toLowerCase()];
+      if (!emoji) continue;
+      found = true;
+      if (match.index > lastIndex) fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      const span = document.createElement('span');
+      span.textContent = emoji;
+      span.title = match[0];
+      span.style.cssText = 'font-size:1.15em;line-height:1;';
+      span.setAttribute('data-mal-czp-injected', '1');
+      fragment.appendChild(span);
+      lastIndex = match.index + match[0].length;
+    }
+    if (!found) return;
+    if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    textNode.replaceWith(fragment);
+  },
+
   prependTimestamp(lineEl) {
     if (lineEl.dataset.malTimestamped) return;
     lineEl.dataset.malTimestamped = '1';
@@ -153,16 +212,23 @@
     if (settings.dzwiekWzmianki) this.playPing();
   },
 
+  textNodesContaining(root, needle) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (node.nodeValue && node.nodeValue.includes(needle) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+    });
+    const nodes = [];
+    let current;
+    while ((current = walker.nextNode())) nodes.push(current);
+    return nodes;
+  },
+
   processLine(lineEl, settings) {
     if (settings.znacznikCzasu) this.prependTimestamp(lineEl);
     if (settings.klikalneLinki) {
-      const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, {
-        acceptNode: (node) => (node.nodeValue && node.nodeValue.includes('http') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
-      });
-      const nodes = [];
-      let current;
-      while ((current = walker.nextNode())) nodes.push(current);
-      nodes.forEach((n) => this.linkifyTextNode(n));
+      this.textNodesContaining(lineEl, 'http').forEach((n) => this.linkifyTextNode(n));
+    }
+    if (settings.emotkiWlaczone) {
+      this.textNodesContaining(lineEl, ':').forEach((n) => this.renderEmoticonsInTextNode(n));
     }
     if (settings.podswietlanieWzmianek) this.highlightMention(lineEl, settings);
   },
