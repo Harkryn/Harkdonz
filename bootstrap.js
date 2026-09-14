@@ -43,18 +43,47 @@ function harkdonzBootstrap(window, privilegedRequest) {
     update.focus();
   };
 
-  function loadScript(file, version) {
+  // raw.githubusercontent.com zawsze wysyla pliki jako Content-Type: text/plain, wiec przy
+  // stronach z naglowkiem X-Content-Type-Options: nosniff przegladarka odmawia wykonania
+  // <script src="..."> wskazujacego tam wprost (cichy blad, brak wpisu w Network). Dlatego
+  // pobieramy tresc przez fetch/GM (dowolny content-type jest ok) i uruchamiamy ja jako
+  // Bloba z jawnie ustawionym typem application/javascript.
+  async function fetchText(file, version) {
+    const url = new URL(file, base);
+    url.searchParams.set('v', version);
+    try {
+      const response = await fetch(url, { cache: 'no-cache', signal: AbortSignal.timeout(20000) });
+      if (!response.ok) throw Error('HTTP ' + response.status);
+      return await response.text();
+    } catch (error) {
+      if (typeof runtime.request !== 'function') throw error;
+      return await new Promise((resolve, reject) => runtime.request({
+        method: 'GET',
+        url: url.href,
+        timeout: 20000,
+        onload: (r) => { if (r.status !== 200) reject(Error('HTTP ' + r.status)); else resolve(r.responseText); },
+        onerror: () => reject(Error('Nie pobrano: ' + file)),
+        ontimeout: () => reject(Error('Przekroczony czas: ' + file)),
+      }));
+    }
+  }
+
+  function runScript(code, file) {
     return new Promise((resolve, reject) => {
+      const blobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
       const script = document.createElement('script');
       script.charset = 'utf-8';
-      const url = new URL(file, base);
-      url.searchParams.set('v', version);
-      script.src = url.href;
-      const timeout = setTimeout(() => { script.remove(); reject(Error('Przekroczony czas: ' + file)); }, 20000);
-      script.onload = () => { clearTimeout(timeout); resolve(); };
-      script.onerror = () => { clearTimeout(timeout); script.remove(); reject(Error('Nie pobrano: ' + file)); };
+      script.src = blobUrl;
+      const cleanup = () => URL.revokeObjectURL(blobUrl);
+      script.onload = () => { cleanup(); resolve(); };
+      script.onerror = () => { cleanup(); script.remove(); reject(Error('Blad wykonania: ' + file)); };
       document.head.append(script);
     });
+  }
+
+  async function loadScript(file, version) {
+    const code = await fetchText(file, version);
+    await runScript(code, file);
   }
 
   (async () => {
