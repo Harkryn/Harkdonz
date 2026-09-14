@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Auto-relogger
+// @name         Harkdonz - Auto-relogger
 // @namespace    margonem-addon-loader
 // @version      1.0.1
 // @description  Automatycznie klika przycisk wznowienia sesji po rozłączeniu. Nie przechowuje ani nie wpisuje hasła.

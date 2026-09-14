@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Wołacz bossów
+// @name         Harkdonz - Wołacz bossów
 // @namespace    margonem-addon-loader
 // @version      1.1.0
 // @description  Wykrywa Herosów, Kolosów i Tytanów na mapie i powiadamia (toast/dźwięk/kopiowanie do schowka).

@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Aura postaci
+// @name         Harkdonz - Aura postaci
 // @namespace    margonem-addon-loader
 // @version      2.0.0
 // @description  Rozbudowana, konfigurowalna aura wokół postaci: poświata, halo, cykl RGB, ślad i lokalne profile - przepisane z god-mode.js Shacal Customizer.

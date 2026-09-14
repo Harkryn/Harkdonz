@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "scripts": [
+    "margonem-addon-loader.user.js",
+    "aura-postaci.user.js",
+    "auto-relogger.user.js",
+    "czat-plus.user.js",
+    "notyfikator-legend.user.js",
+    "ramki-dymki.user.js",
+    "wolacz-bossow.user.js"
+  ]
+}

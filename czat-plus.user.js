@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Czat plus
+// @name         Harkdonz - Czat plus
 // @namespace    margonem-addon-loader
 // @version      1.1.0
 // @description  Znaczniki czasu, klikalne linki i podświetlanie wzmianek na czacie.

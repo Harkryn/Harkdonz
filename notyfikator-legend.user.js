@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Notyfikator legend
+// @name         Harkdonz - Notyfikator legend
 // @namespace    margonem-addon-loader
 // @version      3.1.1
 // @description  Neonowe ramki okna łupu/mapy, podświetlenie itemu i napis przy legendarnym przedmiocie - port sprawdzonego, działającego skryptu użytkownika pod nasz loader.

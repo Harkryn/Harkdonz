@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Margonem Addon Loader - Przykładowy dodatek
+// @name         Harkdonz - Przykładowy dodatek
 // @namespace    margonem-addon-loader
 // @version      1.0.1
-// @description  Szablon pokazujący jak podpiąć nowy dodatek pod Margonem Addon Loader.
+// @description  Szablon pokazujący jak podpiąć nowy dodatek pod Harkdonz.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
 // @match        *://*.margonem.com/*

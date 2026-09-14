@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         MAL - Ramki i dymki
+// @name         Harkdonz - Ramki i dymki
 // @namespace    margonem-addon-loader
 // @version      2.0.0
 // @description  Kolorowe ramki wokół przedmiotów wg rzadkości (unikat/heroiczny/ulepszony/legendarny) + dopasowane dymki (tooltipy) - przepisane z zestawu Shacal Customizer pod nasz loader.

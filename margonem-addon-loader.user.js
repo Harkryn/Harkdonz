@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Margonem Addon Loader
+// @name         Harkdonz
 // @namespace    margonem-addon-loader
-// @version      1.5.0
-// @description  Minimalistyczny, ciemny panel do zarządzania dodatkami Margonem. Sam w sobie nic nie robi - jest bazą, do której podpinają się przyszłe dodatki.
+// @version      1.6.0
+// @description  Nowoczesny, ciemny panel do zarządzania dodatkami Margonem. Sam w sobie nic nie robi - jest bazą, do której podpinają się przyszłe dodatki.
 // @author       aderian359
 // @match        *://*.margonem.pl/*
 // @match        *://*.margonem.com/*
@@ -48,17 +48,17 @@
   const STORAGE_PREFIX = 'mal:';
 
   function log(msg) {
-    console.log('[MAL] ' + msg);
+    console.log('[Harkdonz] ' + msg);
   }
   function warn(msg) {
-    console.warn('[MAL] ' + msg);
+    console.warn('[Harkdonz] ' + msg);
   }
   function safeCall(fn, ctx, ...args) {
     if (typeof fn !== 'function') return;
     try {
       fn.apply(ctx, args);
     } catch (err) {
-      console.error('[MAL] Błąd w dodatku "' + (ctx && ctx.id) + '":', err);
+      console.error('[Harkdonz] Błąd w dodatku "' + (ctx && ctx.id) + '":', err);
     }
   }
 
@@ -117,136 +117,183 @@
 
   const ICON_SVG =
     '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M14.7 6.3a2 2 0 1 0-3.4-1.4V6.3H7.5a1 1 0 0 0-1 1v3.8H4.9a2 2 0 1 0 0 4H6.5V19a1 1 0 0 0 1 1h3.8v-1.6a2 2 0 1 1 4 0V20H19a1 1 0 0 0 1-1v-3.8h1.6a2 2 0 1 0 0-4H20V7.3a1 1 0 0 0-1-1h-4.3V6.3Z" ' +
-    'stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+    '<line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<circle cx="9" cy="6" r="2.1" fill="currentColor"/>' +
+    '<line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<circle cx="15" cy="12" r="2.1" fill="currentColor"/>' +
+    '<line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<circle cx="11" cy="18" r="2.1" fill="currentColor"/></svg>';
 
   const CSS = `
     #mal-root, #mal-root *, #mal-backdrop, #mal-backdrop * { box-sizing: border-box; }
     #mal-root {
       position: fixed; z-index: 999999; bottom: 18px; right: 18px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      color: #e4e4e7;
+      color: #e8e8ed;
     }
     #mal-toggle-btn {
-      position: relative; width: 46px; height: 46px; border-radius: 50%;
-      background: #1c1d21; border: 1px solid rgba(255,255,255,0.08);
-      color: var(--mal-accent, #6d4fe0); cursor: pointer; display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      transition: transform .15s ease, background .15s ease, color .15s ease;
+      position: relative; width: 50px; height: 50px; border-radius: 50%;
+      background: linear-gradient(160deg, #1d1e24, #16171b);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: color-mix(in srgb, var(--mal-accent, #6d4fe0) 60%, #fff);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.02) inset;
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, color .15s ease;
     }
-    #mal-toggle-btn:hover { background: #24252b; transform: translateY(-1px); }
+    #mal-toggle-btn::before {
+      content: ''; position: absolute; inset: -3px; border-radius: 50%; z-index: -1;
+      background: conic-gradient(from 0deg, var(--mal-accent, #6d4fe0), color-mix(in srgb, var(--mal-accent, #6d4fe0) 30%, #ff7ad9), var(--mal-accent, #6d4fe0));
+      opacity: 0; transition: opacity .2s ease; filter: blur(6px);
+    }
+    #mal-toggle-btn:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+    #mal-toggle-btn:hover::before { opacity: .55; }
     #mal-toggle-btn .mal-badge {
-      position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px;
-      border-radius: 8px; background: var(--mal-accent, #6d4fe0); color: #fff; font-size: 10px; line-height: 16px;
-      text-align: center; font-weight: 600;
+      position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px;
+      border-radius: 9px; background: var(--mal-accent, #6d4fe0); color: #fff; font-size: 10px; line-height: 17px;
+      text-align: center; font-weight: 700; box-shadow: 0 0 0 2px #131316, 0 2px 8px color-mix(in srgb, var(--mal-accent, #6d4fe0) 60%, transparent);
     }
     #mal-backdrop {
       position: fixed; inset: 0; z-index: 999998;
-      background: rgba(8,8,12,.6);
+      background: rgba(6,6,10,.55);
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
       display: flex; align-items: center; justify-content: center;
-      opacity: 0; pointer-events: none; transition: opacity .18s ease;
+      opacity: 0; pointer-events: none; transition: opacity .2s ease;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      color: #e4e4e7;
+      color: #e8e8ed;
     }
     #mal-backdrop.mal-open { opacity: 1; pointer-events: auto; }
     #mal-modal {
-      width: min(760px, 94vw); height: min(78vh, 620px);
-      background: #17181c; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
-      box-shadow: 0 24px 64px rgba(0,0,0,.55);
+      position: relative;
+      width: min(780px, 94vw); height: min(80vh, 640px);
+      background: linear-gradient(175deg, #1a1b20 0%, #131317 100%);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 20px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03) inset;
       display: flex; flex-direction: column; overflow: hidden;
-      transform: translateY(14px) scale(.97); transition: transform .18s ease;
+      transform: translateY(16px) scale(.96); transition: transform .22s cubic-bezier(.2,.8,.2,1);
+    }
+    #mal-modal::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--mal-accent, #6d4fe0), transparent);
+      opacity: .8;
     }
     #mal-backdrop.mal-open #mal-modal { transform: translateY(0) scale(1); }
     .mal-modal-header {
-      display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 11px; padding: 16px 18px;
       border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
       cursor: move; user-select: none; -webkit-user-select: none;
     }
-    .mal-modal-title { font-size: 14px; font-weight: 600; letter-spacing: .2px; }
-    .mal-modal-count { font-size: 11px; color: #8b8d98; background: #1f2025; border-radius: 999px; padding: 3px 9px; }
+    .mal-brand {
+      width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--mal-accent, #6d4fe0), color-mix(in srgb, var(--mal-accent, #6d4fe0) 35%, #ff7ad9));
+      color: #fff; font-size: 14px; font-weight: 800; letter-spacing: -.02em;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--mal-accent, #6d4fe0) 40%, transparent);
+    }
+    .mal-modal-titlewrap { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .mal-modal-title {
+      font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2;
+      background: linear-gradient(90deg, #fff, #c9cbd6);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .mal-modal-subtitle { font-size: 10.5px; color: #6b6d76; font-weight: 500; }
+    .mal-modal-count { font-size: 11px; color: #9a9ca6; background: #1f2025; border-radius: 999px; padding: 3px 10px; border: 1px solid rgba(255,255,255,.06); }
     .mal-close-btn {
       margin-left: auto; background: none; border: none; color: #8b8d98; cursor: pointer;
-      font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 6px;
+      font-size: 18px; line-height: 1; padding: 5px 9px; border-radius: 8px; transition: background .15s ease, color .15s ease;
     }
-    .mal-close-btn:hover { color: #e4e4e7; background: rgba(255,255,255,0.06); }
+    .mal-close-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
     .mal-modal-body { flex: 1; display: flex; min-height: 0; }
-    .mal-tabs { width: 210px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid rgba(255,255,255,0.06); padding: 8px; }
-    .mal-tabs::-webkit-scrollbar, .mal-content::-webkit-scrollbar { width: 8px; }
+    .mal-tabs { width: 216px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid rgba(255,255,255,0.06); padding: 10px; }
+    .mal-tabs::-webkit-scrollbar, .mal-content::-webkit-scrollbar { width: 7px; }
     .mal-tabs::-webkit-scrollbar-thumb, .mal-content::-webkit-scrollbar-thumb { background: #2a2b31; border-radius: 8px; }
+    .mal-tabs::-webkit-scrollbar-thumb:hover, .mal-content::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--mal-accent, #6d4fe0) 40%, #2a2b31); }
     .mal-tab {
-      display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px;
-      cursor: pointer; margin-bottom: 2px; transition: background .12s ease;
+      position: relative;
+      display: flex; align-items: center; gap: 9px; padding: 9px 10px 9px 13px; border-radius: 9px;
+      cursor: pointer; margin-bottom: 2px; transition: background .15s ease;
     }
     .mal-tab:hover { background: #1f2025; }
-    .mal-tab.mal-active { background: #24252b; }
+    .mal-tab.mal-active { background: color-mix(in srgb, var(--mal-accent, #6d4fe0) 14%, #1f2025); }
+    .mal-tab.mal-active::before {
+      content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 3px; border-radius: 3px;
+      background: var(--mal-accent, #6d4fe0);
+    }
     .mal-tab-core { border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; padding-bottom: 9px; }
     .mal-tab-name {
-      flex: 1; min-width: 0; font-size: 12px; font-weight: 500; opacity: .8;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      flex: 1; min-width: 0; font-size: 12px; font-weight: 500; opacity: .78;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity .15s ease;
     }
-    .mal-tab.mal-active .mal-tab-name { opacity: 1; }
-    .mal-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #3a3b42; flex-shrink: 0; }
-    .mal-tab-dot.mal-on { background: var(--mal-accent, #6d4fe0); box-shadow: 0 0 6px var(--mal-accent, #6d4fe0); }
-    .mal-content { flex: 1; overflow-y: auto; padding: 20px 22px; }
-    .mal-content-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-    .mal-content-title { font-size: 16px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+    .mal-tab.mal-active .mal-tab-name { opacity: 1; font-weight: 600; }
+    .mal-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #3a3b42; flex-shrink: 0; transition: background .15s ease, box-shadow .15s ease; }
+    .mal-tab-dot.mal-on { background: var(--mal-accent, #6d4fe0); box-shadow: 0 0 7px var(--mal-accent, #6d4fe0); }
+    .mal-content { flex: 1; overflow-y: auto; padding: 22px 24px; }
+    .mal-content-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+    .mal-content-title { font-size: 17px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; letter-spacing: -.01em; }
     .mal-content-version { font-size: 11px; color: #5c5e66; font-weight: 400; }
-    .mal-content-desc { font-size: 12.5px; color: #9a9ca6; margin-top: 4px; line-height: 1.5; }
+    .mal-content-desc { font-size: 12.5px; color: #9a9ca6; margin-top: 5px; line-height: 1.55; }
     .mal-content-switch { margin-left: auto; flex-shrink: 0; }
-    .mal-fields { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .mal-fields { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; position: relative; }
+    .mal-fields::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,.1), transparent 70%);
+    }
     .mal-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
     .mal-field-boolean { flex-direction: row; align-items: center; justify-content: space-between; }
     .mal-field-label { color: #c8c9d0; }
     .mal-input, .mal-select {
-      background: #101114; border: 1px solid rgba(255,255,255,0.08); color: #e4e4e7;
-      border-radius: 7px; padding: 7px 9px; font-size: 12.5px; outline: none;
-      transition: border-color .15s ease;
+      background: #111216; border: 1px solid rgba(255,255,255,0.09); color: #e8e8ed;
+      border-radius: 9px; padding: 8px 10px; font-size: 12.5px; outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
-    .mal-input:focus, .mal-select:focus { border-color: var(--mal-accent, #6d4fe0); }
+    .mal-input:focus, .mal-select:focus { border-color: var(--mal-accent, #6d4fe0); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mal-accent, #6d4fe0) 22%, transparent); }
     .mal-btn {
-      align-self: flex-start; background: #26232f; border: 1px solid var(--mal-accent, #6d4fe0); color: var(--mal-accent, #6d4fe0);
-      padding: 7px 14px; border-radius: 7px; font-size: 12px; cursor: pointer; transition: background .15s ease;
+      align-self: flex-start; background: linear-gradient(135deg, var(--mal-accent, #6d4fe0), color-mix(in srgb, var(--mal-accent, #6d4fe0) 60%, #1a1a1a));
+      border: 1px solid color-mix(in srgb, var(--mal-accent, #6d4fe0) 60%, transparent); color: #fff;
+      padding: 8px 15px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: filter .15s ease, transform .15s ease; box-shadow: 0 4px 14px color-mix(in srgb, var(--mal-accent, #6d4fe0) 30%, transparent);
     }
-    .mal-btn:hover { background: #312c40; }
-    .mal-btn:disabled { opacity: .55; cursor: default; }
+    .mal-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .mal-btn:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
     .mal-header-btn {
-      background: #1f2025; border: 1px solid rgba(255,255,255,0.08); color: #c8c9d0;
-      padding: 6px 12px; border-radius: 7px; font-size: 11.5px; cursor: pointer; transition: background .15s ease;
+      background: #1c1d22; border: 1px solid rgba(255,255,255,0.08); color: #c8c9d0;
+      padding: 7px 13px; border-radius: 9px; font-size: 11.5px; cursor: pointer; transition: background .15s ease, border-color .15s ease;
       white-space: nowrap;
     }
-    .mal-header-btn:hover { background: #262730; }
+    .mal-header-btn:hover { background: #24252b; border-color: color-mix(in srgb, var(--mal-accent, #6d4fe0) 45%, rgba(255,255,255,.08)); }
     .mal-header-btn:disabled { opacity: .55; cursor: default; }
     .mal-tab-update { color: #f5a524; font-size: 9px; margin-left: auto; flex-shrink: 0; }
     .mal-update-notice {
-      background: rgba(245,165,36,.1); border: 1px solid rgba(245,165,36,.4); border-radius: 10px;
-      padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #ffcf8a;
-      display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+      background: rgba(245,165,36,.08); border: 1px solid rgba(245,165,36,.35); border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: #ffcf8a;
+      display: flex; flex-direction: column; gap: 9px; align-items: flex-start;
     }
     .mal-color {
-      width: 40px; height: 26px; padding: 2px; border-radius: 7px; flex-shrink: 0;
-      background: #101114; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+      width: 42px; height: 28px; padding: 2px; border-radius: 8px; flex-shrink: 0;
+      background: #111216; border: 1px solid rgba(255,255,255,0.09); cursor: pointer;
     }
     .mal-color::-webkit-color-swatch-wrapper { padding: 0; }
-    .mal-color::-webkit-color-swatch { border: none; border-radius: 4px; }
-    .mal-empty { padding: 40px 20px; text-align: center; color: #6b6d76; font-size: 12.5px; line-height: 1.6; }
+    .mal-color::-webkit-color-swatch { border: none; border-radius: 5px; }
+    .mal-empty { padding: 50px 20px; text-align: center; color: #6b6d76; font-size: 12.5px; line-height: 1.7; }
     .mal-modal-footer {
-      padding: 8px 18px; font-size: 10px; color: #5c5e66; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+      padding: 9px 18px; font-size: 10px; color: #5c5e66; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
     }
-    .mal-switch { position: relative; width: 34px; height: 20px; flex-shrink: 0; display: inline-block; }
+    .mal-switch { position: relative; width: 36px; height: 21px; flex-shrink: 0; display: inline-block; }
     .mal-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
     .mal-switch-track {
       position: absolute; inset: 0; background: #2a2b31; border-radius: 999px; cursor: pointer;
-      transition: background .15s ease;
+      transition: background .2s ease;
     }
     .mal-switch-track::before {
-      content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px;
-      background: #cfcfd6; border-radius: 50%; transition: transform .15s ease, background .15s ease;
+      content: ''; position: absolute; width: 17px; height: 17px; left: 2px; top: 2px;
+      background: #cfcfd6; border-radius: 50%; transition: transform .2s cubic-bezier(.4,0,.2,1), background .2s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
     }
     .mal-switch input:checked + .mal-switch-track { background: var(--mal-accent, #6d4fe0); }
-    .mal-switch input:checked + .mal-switch-track::before { transform: translateX(14px); background: #fff; }
-    .mal-switch.small { width: 28px; height: 16px; }
-    .mal-switch.small .mal-switch-track::before { width: 12px; height: 12px; left: 2px; top: 2px; }
-    .mal-switch.small input:checked + .mal-switch-track::before { transform: translateX(12px); }
+    .mal-switch input:checked + .mal-switch-track::before { transform: translateX(15px); background: #fff; }
+    .mal-switch.small { width: 30px; height: 17px; }
+    .mal-switch.small .mal-switch-track::before { width: 13px; height: 13px; left: 2px; top: 2px; }
+    .mal-switch.small input:checked + .mal-switch-track::before { transform: translateX(13px); }
   `;
 
   const state = {
@@ -572,7 +619,7 @@
 
     const badgeEl = el('span', { class: 'mal-badge' }, ['0']);
     badgeEl.style.display = 'none';
-    const toggleBtn = el('button', { id: 'mal-toggle-btn', html: ICON_SVG, title: 'Dodatki Margonem' });
+    const toggleBtn = el('button', { id: 'mal-toggle-btn', html: ICON_SVG, title: 'Harkdonz (Alt+M)' });
     toggleBtn.appendChild(badgeEl);
 
     const countEl = el('span', { class: 'mal-modal-count' }, ['0/0']);
@@ -581,7 +628,11 @@
     const updateBtn = el('button', { class: 'mal-header-btn', type: 'button' }, ['Sprawdź aktualizacje']);
     updateBtn.addEventListener('click', () => checkAllUpdates(updateBtn));
     const header = el('div', { class: 'mal-modal-header' }, [
-      el('span', { class: 'mal-modal-title' }, ['Dodatki Margonem']),
+      el('div', { class: 'mal-brand' }, ['H']),
+      el('div', { class: 'mal-modal-titlewrap' }, [
+        el('span', { class: 'mal-modal-title' }, ['Harkdonz']),
+        el('span', { class: 'mal-modal-subtitle' }, ['Panel dodatków']),
+      ]),
       countEl,
       updateBtn,
       el('button', { class: 'mal-close-btn', html: '&times;', onClick: closeModal }),
@@ -589,7 +640,10 @@
     const tabsEl = el('div', { class: 'mal-tabs' });
     const contentEl = el('div', { class: 'mal-content' });
     const body = el('div', { class: 'mal-modal-body' }, [tabsEl, contentEl]);
-    const footer = el('div', { class: 'mal-modal-footer' }, ['Margonem Addon Loader v1.5.0']);
+    const footer = el('div', { class: 'mal-modal-footer' }, [
+      el('span', {}, ['Harkdonz']),
+      el('span', {}, ['v1.6.0']),
+    ]);
     const modal = el('div', { id: 'mal-modal' }, [header, body, footer]);
 
     backdrop.appendChild(modal);
